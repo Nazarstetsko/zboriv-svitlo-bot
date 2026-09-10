@@ -51,6 +51,9 @@ OFFICIAL = {
     "gas": "https://gas.ua/uk/home/contacts",
     "gas_indicators": "https://gas.ua/uk/indicators",
     "invest": "https://invest.zborivska-gromada.gov.ua/",
+    "bus_ternopil_zboriv": "https://railukraine.com/uk/rozklad-avtobusiv/ternopil/zboriv",
+    "bus_zboriv_ternopil": "https://rubikon.com.ua/direction/zboriv/ternopil",
+    "bus_station": "https://bus-info.in.ua/ternopilska-oblast/zboriv/",
 }
 
 # Статичні контакти, перевірені перед створенням цієї версії.
@@ -209,6 +212,44 @@ def subscribers(settlement: str):
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
+# Громадський транспорт — дані, перевірені у відкритих онлайн-джерелах у вересні 2026.
+TRANSPORT_2026 = {
+    "Тернопіль → Зборів": [
+        "06:15 → 07:02 — рейс Тернопіль → Жабиня",
+        "07:00 → 07:55 — рейс Тернопіль → Манаїв",
+        "09:40 → 10:30 — рейс Тернопіль → Жабиня",
+        "12:20 → 13:15 — рейс Тернопіль → Жабиня",
+        "12:50 → 13:50 — рейс Тернопіль → Манаїв",
+        "14:15 → 15:05 — рейс Тернопіль → Жабиня",
+        "15:50 → 16:45 — рейс Тернопіль → Жабиня",
+        "16:00 → 16:47 — рейс Тернопіль → Золочів",
+        "16:15 → 17:10 — рейс Тернопіль → Манаїв",
+        "17:00 → 17:58 — рейс Тернопіль → Жабиня",
+    ],
+    "Зборів → Тернопіль": [
+        "07:55 — актуальний рейс Зборів → Тернопіль, підтверджений онлайн на 11.09.2026",
+    ],
+}
+
+def transport_menu():
+    b = InlineKeyboardBuilder()
+    b.button(text="🏙️ Тернопіль → Зборів", callback_data="transport:to_zboriv")
+    b.button(text="🏡 Зборів → Тернопіль", callback_data="transport:to_ternopil")
+    b.button(text="🏘️ Місцеві маршрути", callback_data="transport:local")
+    b.button(text="🔎 Онлайн-розклад", callback_data="transport:online")
+    b.button(text="ℹ️ Важливо про розклад", callback_data="transport:info")
+    b.button(text="🏠 Головне меню", callback_data="main")
+    b.adjust(2, 2, 1, 1)
+    return b.as_markup()
+
+def transport_text(direction: str):
+    rows = TRANSPORT_2026[direction]
+    return (
+        f"🚌 <b>{direction}</b>\n\n"
+        + "\n".join(f"• {row}" for row in rows)
+        + "\n\n⚠️ <i>Розклад може змінюватися перевізником. Перед поїздкою перевіряйте актуальний рейс за посиланням нижче.</i>"
+    )
+
 def main_menu():
     b = InlineKeyboardBuilder()
     b.button(text="⚡ Електроенергія", callback_data="main:electricity")
@@ -218,9 +259,10 @@ def main_menu():
     b.button(text="🗺️ Мій населений пункт", callback_data="main:my_place")
     b.button(text="📞 Корисні контакти", callback_data="main:contacts")
     b.button(text="🆘 Важлива інформація", callback_data="main:important")
+    b.button(text="🚌 Автобуси та розклад", callback_data="main:transport")
     b.button(text="🤖 Автодопомога 24/7 Чат", callback_data="main:help_chat")
     b.button(text="⚙️ Налаштування", callback_data="main:settings")
-    b.adjust(2, 2, 2, 1, 1, 1)
+    b.adjust(2, 2, 2, 2, 1, 1, 1)
     return b.as_markup()
 
 def back_main():
@@ -470,6 +512,68 @@ async def main_important(call: CallbackQuery):
         "Тут зібрані екстрені контакти та короткі інструкції "
         "для аварійних ситуацій.",
         parse_mode="HTML", reply_markup=important_menu()
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "main:transport")
+async def main_transport(call: CallbackQuery):
+    await call.message.edit_text(
+        "🚌 <b>АВТОБУСИ ТА РОЗКЛАД</b>\n\n"
+        "Розділ містить доступні дані про автобусні сполучення Зборова та напрямки громади. "
+        "Дані актуалізуються за відкритими онлайн-джерелами.",
+        parse_mode="HTML", reply_markup=transport_menu()
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "transport:to_zboriv")
+async def transport_to_zboriv(call: CallbackQuery):
+    await call.message.edit_text(transport_text("Тернопіль → Зборів"), parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔎 Актуальний онлайн-розклад", url=OFFICIAL["bus_ternopil_zboriv"])],
+        [InlineKeyboardButton(text="⬅️ Автобуси та розклад", callback_data="main:transport")],
+    ]))
+    await call.answer()
+
+@dp.callback_query(F.data == "transport:to_ternopil")
+async def transport_to_ternopil(call: CallbackQuery):
+    await call.message.edit_text(transport_text("Зборів → Тернопіль"), parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔎 Перевірити рейс на дату", url=OFFICIAL["bus_zboriv_ternopil"])],
+        [InlineKeyboardButton(text="⬅️ Автобуси та розклад", callback_data="main:transport")],
+    ]))
+    await call.answer()
+
+@dp.callback_query(F.data == "transport:local")
+async def transport_local(call: CallbackQuery):
+    await call.message.edit_text(
+        "🏘️ <b>МІСЦЕВІ МАРШРУТИ</b>\n\n"
+        "У відкритих джерелах є маршрути через населені пункти громади, зокрема Манаїв, Жабиню, Кальне, Нище, Храбузну, Бзовицю, Годів та інші.\n\n"
+        "⚠️ Частина опублікованих таблиць має старі дати, тому я не видаю їх за гарантовано актуальний розклад 2026 року.",
+        parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔎 Розклад автостанції Зборів", url=OFFICIAL["bus_station"])],
+            [InlineKeyboardButton(text="⬅️ Автобуси та розклад", callback_data="main:transport")],
+        ])
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "transport:online")
+async def transport_online(call: CallbackQuery):
+    await call.message.edit_text(
+        "🔎 <b>ОНЛАЙН-РОЗКЛАД</b>\n\nДля точного часу на конкретну дату використовуйте актуальні сторінки розкладу.",
+        parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🚌 Тернопіль → Зборів", url=OFFICIAL["bus_ternopil_zboriv"])],
+            [InlineKeyboardButton(text="🚌 Зборів → Тернопіль", url=OFFICIAL["bus_zboriv_ternopil"])],
+            [InlineKeyboardButton(text="⬅️ Автобуси та розклад", callback_data="main:transport")],
+        ])
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "transport:info")
+async def transport_info(call: CallbackQuery):
+    await call.message.edit_text(
+        "ℹ️ <b>ПРО РОЗКЛАД</b>\n\nДані в боті не замінюють підтвердження рейсу. Перевізник може змінити час або скасувати рейс. Перед поїздкою перевіряйте конкретну дату.",
+        parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔎 Онлайн-розклад", callback_data="transport:online")],
+            [InlineKeyboardButton(text="⬅️ Автобуси та розклад", callback_data="main:transport")],
+        ])
     )
     await call.answer()
 
@@ -906,3 +1010,4 @@ async def main():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
+
