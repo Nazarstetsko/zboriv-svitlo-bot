@@ -2,6 +2,9 @@ import asyncio
 import logging
 import os
 import sqlite3
+import json
+import urllib.request
+import urllib.error
 from pathlib import Path
 from urllib.parse import quote
 
@@ -19,6 +22,8 @@ ADMIN_IDS = {
 }
 DB_PATH = Path(os.getenv("DB_PATH", "zboriv_svitlo.db"))
 COMMUNITY_CHAT_URL = os.getenv("COMMUNITY_CHAT_URL", "").strip()
+ALERTS_API_TOKEN = os.getenv("ALERTS_API_TOKEN", "").strip()
+ALERTS_POLL_SECONDS = int(os.getenv("ALERTS_POLL_SECONDS", "10"))
 
 # 53 населені пункти громади — збережено існуючий список бота.
 SETTLEMENTS = [
@@ -152,6 +157,13 @@ def db():
             settlement TEXT NOT NULL
         )"""
     )
+    con.execute(
+        """CREATE TABLE IF NOT EXISTS alarm_subscriptions (
+            user_id INTEGER PRIMARY KEY,
+            settlement TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
     con.commit()
     return con
 
@@ -210,6 +222,36 @@ def subscribers(settlement: str):
     con.close()
     return [r[0] for r in rows]
 
+def set_alarm_subscription(user_id: int, settlement: str):
+    con = db()
+    con.execute(
+        "INSERT INTO alarm_subscriptions(user_id, settlement) VALUES(?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET settlement=excluded.settlement",
+        (user_id, settlement),
+    )
+    con.commit()
+    con.close()
+
+def remove_alarm_subscription(user_id: int):
+    con = db()
+    con.execute("DELETE FROM alarm_subscriptions WHERE user_id=?", (user_id,))
+    con.commit()
+    con.close()
+
+def get_alarm_subscription(user_id: int):
+    con = db()
+    row = con.execute(
+        "SELECT settlement FROM alarm_subscriptions WHERE user_id=?", (user_id,)
+    ).fetchone()
+    con.close()
+    return row[0] if row else None
+
+def alarm_subscribers():
+    con = db()
+    rows = con.execute("SELECT user_id, settlement FROM alarm_subscriptions").fetchall()
+    con.close()
+    return rows
+
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
@@ -247,13 +289,11 @@ TRANSPORT_SOURCES_TEXT = (
 
 def transport_menu():
     b = InlineKeyboardBuilder()
-    b.button(text="🏘️ Обрати населений пункт", callback_data="transport:places:0")
     b.button(text="🏙️ Тернопіль → Зборів", callback_data="transport:to_zboriv")
     b.button(text="🏡 Зборів → Тернопіль", callback_data="transport:to_ternopil")
-    b.button(text="🔎 Онлайн-розклад", callback_data="transport:online")
-    b.button(text="ℹ️ Важливо про розклад", callback_data="transport:info")
+    b.button(text="🏘️ Розклад по населених пунктах громади", callback_data="transport:places:0")
     b.button(text="🏠 Головне меню", callback_data="main")
-    b.adjust(1, 2, 2, 1)
+    b.adjust(1, 1, 1, 1)
     return b.as_markup()
 
 def transport_places_keyboard(page: int = 0):
@@ -340,11 +380,20 @@ def main_menu():
     b.button(text="🏢 Комунальні послуги", callback_data="main:utilities")
     b.button(text="🚌 Автобуси та розклад", callback_data="main:transport")
     b.button(text="📞 Корисні контакти", callback_data="main:contacts")
+    b.button(text="🚗 Водієві", callback_data="main:drivers")
     b.button(text="🏛️ Про громаду", callback_data="main:community")
     b.button(text="📰 Новини", callback_data="main:news")
     b.button(text="💬 Спілкування 24/7", callback_data="main:community_chat")
     b.button(text="🚨 Тривога", callback_data="main:alarm")
-    b.adjust(1, 1, 1, 2, 1, 1)
+    b.adjust(2, 2, 2, 2)
+    return b.as_markup()
+
+def drivers_menu():
+    b = InlineKeyboardBuilder()
+    b.button(text="🔧 Контакти СТО", callback_data="driver:sto")
+    b.button(text="🛞 Магазини автозапчастин", callback_data="driver:parts")
+    b.button(text="🏠 Головне меню", callback_data="main")
+    b.adjust(1, 1, 1)
     return b.as_markup()
 
 def back_main():
@@ -695,6 +744,20 @@ async def transport_online(call: CallbackQuery):
     )
     await call.answer()
 
+@dp.callback_query(F.data == "transport:trains")
+async def transport_trains(call: CallbackQuery):
+    await call.message.edit_text(
+        "🚆 <b>ЕЛЕКТРИЧКИ: ТЕРНОПІЛЬ ↔ ЗБОРІВ</b>\n\n"
+        "Розклад потрібно перевіряти на конкретну дату, оскільки він може змінюватися.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🚆 Тернопіль → Зборів", url="https://poizdato.net/rozklad-poizdiv/ternopil--zboriv/elektrychky/")],
+            [InlineKeyboardButton(text="🚆 Зборів → Тернопіль", url="https://poizdato.net/rozklad-poizdiv/zboriv--ternopil/elektrychky/")],
+            [InlineKeyboardButton(text="⬅️ Автобуси та розклад", callback_data="main:transport")]
+        ])
+    )
+    await call.answer()
+
 @dp.callback_query(F.data == "transport:info")
 async def transport_info(call: CallbackQuery):
     await call.message.edit_text(
@@ -732,6 +795,45 @@ async def transport_place(call: CallbackQuery):
     )
     await call.answer()
 
+@dp.callback_query(F.data == "main:drivers")
+async def main_drivers(call: CallbackQuery):
+    await call.message.edit_text(
+        "🚗 <b>ВОДІЄВІ</b>\n\n"
+        "<b>Все для автомобіліста</b> — корисні контакти та сервіси для водіїв у Зборові та громаді.",
+        parse_mode="HTML", reply_markup=drivers_menu()
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "driver:sto")
+async def driver_sto(call: CallbackQuery):
+    url = "https://www.google.com/maps/search/?api=1&query=" + quote("СТО Зборів Тернопільська область")
+    await call.message.edit_text(
+        "🔧 <b>КОНТАКТИ СТО</b>\n\n"
+        "Знайти найближчі станції технічного обслуговування у Зборові можна на карті.\n\n"
+        "⚠️ Перед візитом рекомендуємо уточнити графік роботи та наявність потрібної послуги.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📍 СТО у Зборові", url=url)],
+            [InlineKeyboardButton(text="⬅️ Водієві", callback_data="main:drivers")],
+        ])
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "driver:parts")
+async def driver_parts(call: CallbackQuery):
+    url = "https://www.google.com/maps/search/?api=1&query=" + quote("магазин автозапчастин Зборів Тернопільська область")
+    await call.message.edit_text(
+        "🛞 <b>МАГАЗИНИ АВТОЗАПЧАСТИН</b>\n\n"
+        "Знайти магазини автозапчастин у Зборові та поблизу можна на карті.\n\n"
+        "⚠️ Наявність деталей та графік роботи краще уточнювати безпосередньо перед поїздкою.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📍 Автозапчастини у Зборові", url=url)],
+            [InlineKeyboardButton(text="⬅️ Водієві", callback_data="main:drivers")],
+        ])
+    )
+    await call.answer()
+
 @dp.callback_query(F.data == "main:community_chat")
 async def main_community_chat(call: CallbackQuery):
     if COMMUNITY_CHAT_URL:
@@ -755,103 +857,184 @@ async def main_community_chat(call: CallbackQuery):
     await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
 
+def alarm_places_keyboard(page: int = 0):
+    total_pages = (len(SETTLEMENTS) + PAGE_SIZE - 1) // PAGE_SIZE
+    page = max(0, min(page, total_pages - 1))
+    start = page * PAGE_SIZE
+    items = SETTLEMENTS[start:start + PAGE_SIZE]
+    b = InlineKeyboardBuilder()
+    for i, name in enumerate(items, start=start):
+        b.button(text=f"📍 {name}", callback_data=f"alarmplace:{i}")
+    b.adjust(2)
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"alarmplaces:{page-1}"))
+    nav.append(InlineKeyboardButton(text=f"{page+1}/{total_pages}", callback_data="noop"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton(text="Далі ➡️", callback_data=f"alarmplaces:{page+1}"))
+    b.row(*nav)
+    b.row(InlineKeyboardButton(text="🏠 Головне меню", callback_data="main"))
+    return b.as_markup()
+
+def alarm_menu(user_id: int):
+    current = get_alarm_subscription(user_id)
+    rows = [
+        [InlineKeyboardButton(text="🚨 Відкрити карту тривог", url="https://map.ukrainealarm.com/")],
+        [InlineKeyboardButton(text="🔔 Підписатися за моєю локацією", callback_data="alarm:location")],
+    ]
+    if current:
+        rows.append([InlineKeyboardButton(text=f"📍 Моя локація: {current}", callback_data="alarm:status")])
+        rows.append([InlineKeyboardButton(text="🔕 Відписатися від тривог", callback_data="alarm:unsubscribe")])
+    rows.append([InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
 @dp.callback_query(F.data == "main:alarm")
 async def main_alarm(call: CallbackQuery):
+    current = get_alarm_subscription(call.from_user.id)
+    status = f"\n\n📍 Ваша локація: <b>{current}</b>" if current else "\n\n📍 Локацію для сповіщень ще не обрано."
+    api_status = (
+        "\n\n🟢 Автоматичні сповіщення підключені." if ALERTS_API_TOKEN
+        else "\n\n🟡 Для автоматичних сповіщень потрібно додати <code>ALERTS_API_TOKEN</code> у Railway."
+    )
     await call.message.edit_text(
         "🚨 <b>ПОВІТРЯНА ТРИВОГА</b>\n\n"
-        "Перевіряйте актуальний статус тривог та у разі сигналу негайно прямуйте до укриття.\n\n"
-        "Найкраще використовувати офіційні сповіщення та перевірену карту тривог.",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🚨 Відкрити карту тривог", url="https://map.ukrainealarm.com/")],
-            [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
-        ])
+        "Оберіть населений пункт і бот автоматично надсилатиме повідомлення про початок тривоги та відбій. "
+        "Також можна відкрити офіційну карту." + status + api_status,
+        parse_mode="HTML", reply_markup=alarm_menu(call.from_user.id)
     )
     await call.answer()
 
-
-@dp.callback_query(F.data == "main:transport")
-async def final_transport_2026(call: CallbackQuery):
-    b = InlineKeyboardBuilder()
-    b.button(text="🏙️ Тернопіль → Зборів", callback_data="transport:to_zboriv")
-    b.button(text="🏡 Зборів → Тернопіль", callback_data="transport:to_ternopil")
-    b.button(text="🏘️ Розклад по населених пунктах", callback_data="transport:settlements")
-    b.button(text="🚆 Електрички", callback_data="transport:trains")
-    b.button(text="🏠 Головне меню", callback_data="main")
-    b.adjust(2, 2, 1)
+@dp.callback_query(F.data == "alarm:location")
+async def alarm_location(call: CallbackQuery):
     await call.message.edit_text(
-        "🚌 <b>АВТОБУСИ ТА РОЗКЛАД</b>\n\nОберіть напрямок:",
-        parse_mode="HTML", reply_markup=b.as_markup()
+        "📍 <b>ОБЕРІТЬ НАСЕЛЕНИЙ ПУНКТ</b>\n\n"
+        "Саме для нього ви отримуватимете повідомлення про повітряну тривогу та відбій.",
+        parse_mode="HTML", reply_markup=alarm_places_keyboard(0)
     )
     await call.answer()
 
-@dp.callback_query(F.data == "transport:to_zboriv")
-async def final_to_zboriv(call: CallbackQuery):
-    d = TRANSPORT_2026["Тернопіль → Зборів"]
-    await call.message.edit_text(
-        "🏙️ <b>ТЕРНОПІЛЬ → ЗБОРІВ</b>\n\n"
-        + d["summary"] + "\n\n" + "\n".join("• "+x for x in d["examples"]) +
-        "\n\n⚠️ Перед поїздкою перевіряйте конкретну дату.",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔎 Актуальний розклад", url=d["source"])],
-            [InlineKeyboardButton(text="⬅️ Автобуси та розклад", callback_data="main:transport")]
-        ])
-    )
+@dp.callback_query(F.data.startswith("alarmplaces:"))
+async def alarm_places_page(call: CallbackQuery):
+    p = int(call.data.split(":")[1])
+    await call.message.edit_reply_markup(reply_markup=alarm_places_keyboard(p))
     await call.answer()
 
-@dp.callback_query(F.data == "transport:to_ternopil")
-async def final_to_ternopil(call: CallbackQuery):
-    d = TRANSPORT_2026["Зборів → Тернопіль"]
+@dp.callback_query(F.data.startswith("alarmplace:"))
+async def alarm_place(call: CallbackQuery):
+    index = int(call.data.split(":")[1])
+    settlement = SETTLEMENTS[index]
+    set_alarm_subscription(call.from_user.id, settlement)
     await call.message.edit_text(
-        "🏡 <b>ЗБОРІВ → ТЕРНОПІЛЬ</b>\n\n" + d["summary"] +
-        "\n\n⚠️ Рейс і час залежать від дати.",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔎 Перевірити на дату", url=d["source"])],
-            [InlineKeyboardButton(text="⬅️ Автобуси та розклад", callback_data="main:transport")]
-        ])
+        f"🔔 <b>Сповіщення увімкнено</b>\n\n"
+        f"📍 Локація: <b>{settlement}</b>\n\n"
+        "Тепер бот перевірятиме актуальний статус тривоги та надсилатиме повідомлення про початок і відбій.\n\n"
+        "⚠️ Це інформаційний сервіс. У разі небезпеки орієнтуйтеся на офіційні сповіщення та негайно прямуйте в укриття.",
+        parse_mode="HTML", reply_markup=alarm_menu(call.from_user.id)
     )
+    await call.answer("Сповіщення увімкнено ✅")
+
+@dp.callback_query(F.data == "alarm:status")
+async def alarm_status(call: CallbackQuery):
+    place = get_alarm_subscription(call.from_user.id)
+    text = (
+        f"🔔 <bПІДПИСКА НА ТРИВОГУ</b>\n\n📍 Ваша локація: <b>{place}</b>\n\n"
+        "Автоматичні сповіщення активні." if place else
+        "🔔 <b>ПІДПИСКА</b>\n\nЛокацію ще не обрано."
+    )
+    # Correct malformed tag defensively for old clients/code edits.
+    text = text.replace("<bПІДПИСКА", "<b>ПІДПИСКА")
+    await call.message.edit_text(text, parse_mode="HTML", reply_markup=alarm_menu(call.from_user.id))
     await call.answer()
 
-@dp.callback_query(F.data == "transport:settlements")
-async def final_transport_settlements(call: CallbackQuery):
-    b = InlineKeyboardBuilder()
-    settlements = [
-        "Івачів","Августівка","Беримівці","Бзовиця","Велика Плавуча","Вовчківці",
-        "Волосівка","Вільшанка","Вірлів","Гарбузів","Годів","Грабківці","Гукалівці",
-        "Жабиня","Жуківці","Заруддя","Зборів","Йосипівка","Кабарівці","Калинівка",
-        "Кальне","Корчунок","Коршилів","Красна","Кудинівці","Кудобинці","Лавриківці",
-        "Лопушани","Манаїв","Метенів","Млинівці","Монилівка","Мшана","Нище",
-        "Озерянка","Оліїв","Перепельники","Підгайчики","Плісняни","Погрібці",
-        "Присівці","Розгадів","Славна","Травотолоки","Тустоголови","Футори",
-        "Хоробрів","Хоростець","Храбузна","Цецівка","Цицори","Ярославичі","Ярчівці"
-    ]
-    for s in settlements:
-        b.button(text=f"📍 {s}", callback_data=f"transport:settlement:{s}")
-    b.button(text="⬅️ Автобуси та розклад", callback_data="main:transport")
-    b.adjust(2)
+@dp.callback_query(F.data == "alarm:unsubscribe")
+async def alarm_unsubscribe(call: CallbackQuery):
+    remove_alarm_subscription(call.from_user.id)
     await call.message.edit_text(
-        "🏘️ <b>РОЗКЛАД ПО НАСЕЛЕНИХ ПУНКТАХ</b>\n\n"
-        "Обирайте населений пункт. Показуємо лише підтверджені дані 2026 року.",
-        parse_mode="HTML", reply_markup=b.as_markup()
+        "🔕 <b>Сповіщення про повітряні тривоги вимкнено.</b>",
+        parse_mode="HTML", reply_markup=alarm_menu(call.from_user.id)
     )
-    await call.answer()
+    await call.answer("Відписано ✅")
 
-@dp.callback_query(F.data == "transport:trains")
-async def final_transport_trains(call: CallbackQuery):
-    await call.message.edit_text(
-        "🚆 <b>ЕЛЕКТРИЧКИ ЗБОРІВ — ТЕРНОПІЛЬ</b>\n\n"
-        "Поточний онлайн-розклад 2026 року показує 3 приміські поїзди. "
-        "Розклад може змінюватися.",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🚆 Тернопіль → Зборів", url="https://poizdato.net/rozklad-poizdiv/ternopil--zboriv/elektrychky/")],
-            [InlineKeyboardButton(text="🚆 Зборів → Тернопіль", url="https://poizdato.net/rozklad-poizdiv/zboriv--ternopil/elektrychky/")],
-            [InlineKeyboardButton(text="⬅️ Автобуси та розклад", callback_data="main:transport")]
-        ])
-    )
-    await call.answer()
+async def fetch_active_alerts():
+    if not ALERTS_API_TOKEN:
+        return None
+    url = "https://api.alerts.in.ua/v1/alerts/active.json"
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {ALERTS_API_TOKEN}"})
+    def _get():
+        with urllib.request.urlopen(req, timeout=8) as response:
+            return json.loads(response.read().decode("utf-8"))
+    try:
+        return await asyncio.to_thread(_get)
+    except Exception as exc:
+        logging.warning("Alerts API error: %s", exc)
+        return None
+
+def alert_applies_to_settlement(alert: dict, settlement: str) -> bool:
+    if alert.get("alert_type") != "air_raid":
+        return False
+    title = str(alert.get("location_title", "")).lower()
+    raion = str(alert.get("location_raion", "")).lower()
+    oblast = str(alert.get("location_oblast", "")).lower()
+    settlement_l = settlement.lower()
+    # Exact community-level alert for Zboriv hromada.
+    if "зборів" in title and ("громад" in title or alert.get("location_type") == "hromada"):
+        return True
+    # If API reports a specific settlement, match it.
+    if settlement_l in title:
+        return True
+    # District/oblast-wide alert covers the user's settlement.
+    if "тернопільськ" in oblast and alert.get("location_type") == "oblast":
+        return True
+    if "тернопільськ" in raion and alert.get("location_type") == "raion":
+        return True
+    return False
+
+async def alerts_monitor(bot: Bot):
+    if not ALERTS_API_TOKEN:
+        logging.warning("ALERTS_API_TOKEN is not set; automatic alarm notifications are disabled.")
+        return
+    previous_active = set()
+    while True:
+        try:
+            data = await fetch_active_alerts()
+            if data is not None:
+                alerts = data.get("alerts", []) if isinstance(data, dict) else []
+                subs = alarm_subscribers()
+                current_keys = set()
+                for alert in alerts:
+                    aid = str(alert.get("id", ""))
+                    if not aid:
+                        continue
+                    for user_id, settlement in subs:
+                        if alert_applies_to_settlement(alert, settlement):
+                            key = (user_id, aid)
+                            current_keys.add(key)
+                            if key not in previous_active:
+                                title = alert.get("location_title", "Території")
+                                await bot.send_message(
+                                    user_id,
+                                    "🚨 <b>ПОВІТРЯНА ТРИВОГА!</b>\n\n"
+                                    f"📍 Локація: <b>{settlement}</b>\n"
+                                    f"📡 Джерело: {title}\n\n"
+                                    "⚠️ Негайно прямуйте до укриття!",
+                                    parse_mode="HTML",
+                                )
+                ended = previous_active - current_keys
+                for user_id, aid in ended:
+                    # A missing alert means the previously active alert ended.
+                    place = get_alarm_subscription(user_id)
+                    if place:
+                        await bot.send_message(
+                            user_id,
+                            "🟢 <b>ВІДБІЙ ПОВІТРЯНОЇ ТРИВОГИ</b>\n\n"
+                            f"📍 Локація: <b>{place}</b>",
+                            parse_mode="HTML",
+                        )
+                previous_active = current_keys
+        except Exception:
+            logging.exception("Alarm monitor iteration failed")
+        await asyncio.sleep(max(10, ALERTS_POLL_SECONDS))
+
 
 @dp.callback_query(F.data == "main:help_chat")
 async def main_help_chat(call: CallbackQuery):
@@ -1309,10 +1492,9 @@ async def main():
     bot = Bot(BOT_TOKEN)
     await bot.delete_webhook(drop_pending_updates=True)
     logging.info("Bot started")
+    asyncio.create_task(alerts_monitor(bot))
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
-
-    
