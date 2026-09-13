@@ -22,7 +22,7 @@ ADMIN_IDS = {
     if x.strip().isdigit()
 }
 DB_PATH = Path(os.getenv("DB_PATH", "zboriv_svitlo.db"))
-COMMUNITY_CHAT_URL = os.getenv("COMMUNITY_CHAT_URL", "").strip() or "https://t.me/zboriv_chat"
+COMMUNITY_CHAT_URL = os.getenv("COMMUNITY_CHAT_URL", "").strip()
 ALERTS_API_TOKEN = os.getenv("ALERTS_API_TOKEN", "").strip()
 ALERTS_POLL_SECONDS = int(os.getenv("ALERTS_POLL_SECONDS", "10"))
 
@@ -526,15 +526,14 @@ def url_keyboard(url: str, map_url: str | None = None):
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 async def show_main(target: Message | CallbackQuery):
-     text = (
-    "🏡 <b>Вітаємо у «Зборів | Моя громада»!</b>\n\n"
-    "📌 <b>Оберіть потрібний розділ нижче:</b>\n\n"
-    "🛡️ <b>Ми дбаємо про безпеку та приватність.</b>\n"
-    "Бот не має доступу до вашого акаунта в Telegram, ваших повідомлень чи особистих чатів.\n\n"
-    "💻 <b>Бот розроблений місцевими розробниками — мешканцями Зборівської громади.</b> 🇺🇦\n\n"
-    "🤝 Ми створили його, щоб зібрати в одному місці корисну, актуальну та важливу інформацію для жителів нашої громади.\n\n"
-    "❤️ <b>Дякуємо, що користуєтеся «Зборів | Моя громада»!</b>"
-)
+    text = (
+        "🏡 <b>Вітаємо у «Зборів | Моя громада»!</b>\n\n"
+        "📌 <b>Оберіть потрібний розділ нижче:</b>\n\n"
+        "🛡️ <b>Ми дбаємо про безпеку та приватність.</b>\n"
+        "Бот не має доступу до вашого акаунта в Telegram, ваших повідомлень чи особистих чатів.\n\n"
+        "💻 <b>Бот розроблений місцевими розробниками — мешканцями Зборівської громади.</b> 🇺🇦\n\n"
+        "🤝 Ми створили його, щоб зібрати в одному місці корисну, актуальну та важливу інформацію для жителів нашої громади.\n\n"
+        "❤️ <b>Дякуємо, що користуєтеся «Зборів | Моя громада»!</b>"
     )
     if isinstance(target, CallbackQuery):
         await target.message.edit_text(text, parse_mode="HTML", reply_markup=main_menu())
