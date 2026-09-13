@@ -165,6 +165,13 @@ def db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )"""
     )
+    con.execute(
+        """CREATE TABLE IF NOT EXISTS bot_feedback (
+            user_id INTEGER PRIMARY KEY,
+            rating TEXT NOT NULL,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
     con.commit()
     return con
 
@@ -252,6 +259,24 @@ def alarm_subscribers():
     rows = con.execute("SELECT user_id, settlement FROM alarm_subscriptions").fetchall()
     con.close()
     return rows
+
+def set_feedback(user_id: int, rating: str):
+    con = db()
+    con.execute(
+        "INSERT INTO bot_feedback(user_id, rating) VALUES(?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET rating=excluded.rating, updated_at=CURRENT_TIMESTAMP",
+        (user_id, rating),
+    )
+    con.commit()
+    con.close()
+
+def get_feedback_stats():
+    con = db()
+    useful = con.execute("SELECT COUNT(*) FROM bot_feedback WHERE rating='useful'").fetchone()[0]
+    not_useful = con.execute("SELECT COUNT(*) FROM bot_feedback WHERE rating='not_useful'").fetchone()[0]
+    total = useful + not_useful
+    con.close()
+    return useful, not_useful, total
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
@@ -387,6 +412,10 @@ def main_menu():
     b.button(text="💬 Спілкування 24/7", callback_data="main:community_chat")
     b.button(text="🚨 Тривога", callback_data="main:alarm")
     b.adjust(2, 2, 2, 2)
+    b.row(
+        InlineKeyboardButton(text="👍 Корисний", callback_data="feedback:useful"),
+        InlineKeyboardButton(text="👎 Не корисний", callback_data="feedback:not_useful"),
+    )
     return b.as_markup()
 
 def drivers_menu():
@@ -509,12 +538,21 @@ async def show_main(target: Message | CallbackQuery):
         await target.answer(text, parse_mode="HTML", reply_markup=main_menu())
 
 def bot_deep_link_menu():
-    # Кнопки в постах групи/каналу, які одразу відкривають потрібний розділ бота.
+    # Кнопки під інформаційними постами: швидкий перехід у потрібний розділ + оцінка поста.
     base = "https://t.me/zboriv_gromada_bot"
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⚡ Підписка на світло", url=f"{base}?start=electricity")],
-        [InlineKeyboardButton(text="🚨 Підписка на тривогу", url=f"{base}?start=alarm")],
-        [InlineKeyboardButton(text="🤖 Відкрити бота", url=base)],
+        [InlineKeyboardButton(text="⚡ Світло", url=f"{base}?start=electricity"),
+         InlineKeyboardButton(text="🚨 Тривога", url=f"{base}?start=alarm")],
+        [InlineKeyboardButton(text="🚌 Транспорт", url=f"{base}?start=transport"),
+         InlineKeyboardButton(text="📞 Контакти", url=f"{base}?start=contacts")],
+        [InlineKeyboardButton(text="🏢 Комунальні", url=f"{base}?start=utilities"),
+         InlineKeyboardButton(text="🚗 Водієві", url=f"{base}?start=drivers")],
+        [InlineKeyboardButton(text="🏛️ Про громаду", url=f"{base}?start=community"),
+         InlineKeyboardButton(text="📰 Новини", url=f"{base}?start=news")],
+        [InlineKeyboardButton(text="💬 Чат 24/7", url=f"{base}?start=community_chat"),
+         InlineKeyboardButton(text="🤖 Відкрити бота", url=base)],
+        [InlineKeyboardButton(text="👍 Корисний", callback_data="feedback:post_useful"),
+         InlineKeyboardButton(text="👎 Не корисний", callback_data="feedback:post_not_useful")],
     ])
 
 
@@ -543,6 +581,46 @@ async def start(message: Message, command: CommandObject):
             parse_mode="HTML", reply_markup=alarm_menu(message.from_user.id)
         )
         return
+    deep_links = {
+        "utilities": ("🏢 <b>КОМУНАЛЬНІ ПОСЛУГИ</b>", utilities_menu),
+        "transport": ("🚌 <b>АВТОБУСИ ТА РОЗКЛАД</b>", transport_menu),
+        "contacts": ("📞 <b>КОРИСНІ КОНТАКТИ</b>", contacts_menu),
+        "drivers": ("🚗 <b>ВОДІЄВІ</b>", drivers_menu),
+    }
+    if payload in deep_links:
+        title, menu_fn = deep_links[payload]
+        await message.answer(title + "\n\nОберіть потрібний розділ:", parse_mode="HTML", reply_markup=menu_fn())
+        return
+    if payload == "community":
+        await message.answer(
+            "🏛️ <b>ПРО ЗБОРІВСЬКУ ГРОМАДУ</b>\n\nОберіть потрібну інформацію.",
+            parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🌐 Офіційний сайт", url=OFFICIAL["community"])],
+                [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")]
+            ])
+        )
+        return
+    if payload == "news":
+        await message.answer(
+            "📰 <b>НОВИНИ</b>\n\nАктуальні новини та важливі повідомлення громади.",
+            parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🌐 Новини громади", url=OFFICIAL["community"])],
+                [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")]
+            ])
+        )
+        return
+    if payload == "community_chat":
+        if COMMUNITY_CHAT_URL:
+            await message.answer(
+                "💬 <b>СПІЛКУВАННЯ 24/7</b>\n\nПриєднуйтесь до чату мешканців громади.",
+                parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="💬 Відкрити чат", url=COMMUNITY_CHAT_URL)],
+                    [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")]
+                ])
+            )
+        else:
+            await show_main(message)
+        return
     await show_main(message)
 
 @dp.message(Command("menu"))
@@ -570,6 +648,64 @@ async def help_cmd(message: Message):
             "/stats — статистика підписок"
         )
     await message.answer(text, parse_mode="HTML")
+
+@dp.message(Command("feedback"))
+async def feedback_command(message: Message):
+    useful, not_useful, total = get_feedback_stats()
+    await message.answer(
+        "⭐ <b>ОЦІНІТЬ БОТА</b>\n\n"
+        "Наскільки цей бот корисний для вас?\n"
+        "Ваш голос допоможе нам зрозуміти, що потрібно покращити.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👍 Корисний", callback_data="feedback:useful"),
+                InlineKeyboardButton(text="👎 Не корисний", callback_data="feedback:not_useful"),
+            ],
+            [InlineKeyboardButton(text=f"📊 Вже проголосували: {total}", callback_data="feedback:stats")]
+        ])
+    )
+
+@dp.callback_query(F.data.in_({"feedback:post_useful", "feedback:post_not_useful"}))
+async def post_feedback_vote(call: CallbackQuery):
+    rating = "useful" if call.data == "feedback:post_useful" else "not_useful"
+    set_feedback(call.from_user.id, rating)
+    if rating == "useful":
+        await call.answer("👍 Дякуємо! Пост корисний.", show_alert=False)
+    else:
+        await call.answer("👎 Дякуємо за думку! Будемо покращувати.", show_alert=False)
+
+@dp.callback_query(F.data.in_({"feedback:useful", "feedback:not_useful"}))
+async def feedback_vote(call: CallbackQuery):
+    rating = "useful" if call.data == "feedback:useful" else "not_useful"
+    set_feedback(call.from_user.id, rating)
+    useful, not_useful, total = get_feedback_stats()
+    message = (
+        "Дякуємо! ❤️ Раді, що бот корисний."
+        if rating == "useful"
+        else "Дякуємо за чесну думку! 🙏 Ми будемо його покращувати."
+    )
+    await call.answer(message, show_alert=True)
+    await call.message.edit_reply_markup(
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👍 Корисний", callback_data="feedback:useful"),
+                InlineKeyboardButton(text="👎 Не корисний", callback_data="feedback:not_useful"),
+            ],
+            [InlineKeyboardButton(text=f"📊 Відгуків: {total}", callback_data="feedback:stats")]
+        ])
+    )
+
+@dp.callback_query(F.data == "feedback:stats")
+async def feedback_stats(call: CallbackQuery):
+    useful, not_useful, total = get_feedback_stats()
+    useful_pct = round(useful * 100 / total) if total else 0
+    not_useful_pct = 100 - useful_pct if total else 0
+    await call.answer(
+        f"👍 Корисний: {useful} ({useful_pct}%)\n"
+        f"👎 Не корисний: {not_useful} ({not_useful_pct}%)",
+        show_alert=True
+    )
 
 @dp.callback_query(F.data == "noop")
 async def noop(call: CallbackQuery):
@@ -1399,6 +1535,22 @@ async def settings_about(call: CallbackQuery):
         reply_markup=back_main()
     )
     await call.answer()
+
+@dp.message(Command("feedback_stats"))
+async def feedback_stats_command(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("⛔ Недоступно.")
+        return
+    useful, not_useful, total = get_feedback_stats()
+    useful_pct = round(useful * 100 / total) if total else 0
+    not_useful_pct = 100 - useful_pct if total else 0
+    await message.answer(
+        "📊 <b>СТАТИСТИКА ОЦІНКИ БОТА</b>\n\n"
+        f"👍 Корисний: <b>{useful}</b> ({useful_pct}%)\n"
+        f"👎 Не корисний: <b>{not_useful}</b> ({not_useful_pct}%)\n"
+        f"👥 Усього оцінок: <b>{total}</b>",
+        parse_mode="HTML"
+    )
 
 @dp.message(Command("stats"))
 async def stats(message: Message):
