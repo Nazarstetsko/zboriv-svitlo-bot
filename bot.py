@@ -10,6 +10,7 @@ from urllib.parse import quote
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
+from aiogram.filters.command import CommandObject
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -507,9 +508,41 @@ async def show_main(target: Message | CallbackQuery):
     else:
         await target.answer(text, parse_mode="HTML", reply_markup=main_menu())
 
+def bot_deep_link_menu():
+    # Кнопки в постах групи/каналу, які одразу відкривають потрібний розділ бота.
+    base = "https://t.me/zboriv_gromada_bot"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⚡ Підписка на світло", url=f"{base}?start=electricity")],
+        [InlineKeyboardButton(text="🚨 Підписка на тривогу", url=f"{base}?start=alarm")],
+        [InlineKeyboardButton(text="🤖 Відкрити бота", url=base)],
+    ])
+
+
 @dp.message(CommandStart())
-async def start(message: Message):
+async def start(message: Message, command: CommandObject):
     db()
+    payload = (command.args or "").strip().lower()
+    if payload == "electricity":
+        await message.answer(
+            "⚡ <b>ЕЛЕКТРОЕНЕРГІЯ</b>\n\n"
+            "Оберіть свій населений пункт, щоб налаштувати підписку та отримувати повідомлення.",
+            parse_mode="HTML", reply_markup=electricity_menu()
+        )
+        return
+    if payload == "alarm":
+        status = get_alarm_subscription(message.from_user.id)
+        api_status = (
+            "\n\n🟢 Автоматичні сповіщення підключені." if ALERTS_API_TOKEN
+            else "\n\n🟡 Для автоматичних сповіщень адміністратору потрібно підключити API."
+        )
+        current = f"\n\n📍 Ваша локація: <b>{status}</b>" if status else ""
+        await message.answer(
+            "🚨 <b>ПОВІТРЯНА ТРИВОГА</b>\n\n"
+            "Оберіть населений пункт для підписки на сповіщення про тривогу та відбій."
+            + current + api_status,
+            parse_mode="HTML", reply_markup=alarm_menu(message.from_user.id)
+        )
+        return
     await show_main(message)
 
 @dp.message(Command("menu"))
@@ -1380,15 +1413,18 @@ async def stats(message: Message):
 async def post(message: Message, bot: Bot):
     if not is_admin(message.from_user.id):
         return
-    raw = message.text or ""
+
+    raw = message.text or message.caption or ""
     payload = raw.partition(" ")[2].strip()
     if "\n" not in payload:
         await message.answer(
-            "Формат:\n"
-            "<code>/post Кальне\n⚠️ Кальне: відключення з 14:00 до 18:00.</code>",
+            "Формат без фото:\n"
+            "<code>/post Кальне\n⚠️ Кальне: відключення з 14:00 до 18:00.</code>\n\n"
+            "Або надішліть фото з таким самим текстом у підписі — бот опублікує фото + текст + кнопки.",
             parse_mode="HTML",
         )
         return
+
     first_line, body = payload.split("\n", 1)
     settlement = first_line.strip()
     if settlement not in SETTLEMENTS:
@@ -1399,26 +1435,52 @@ async def post(message: Message, bot: Bot):
         await message.answer("❌ Текст повідомлення порожній.")
         return
 
-    post_text = f"📍 <b>{settlement}</b>\n\n{body}\n\n#ЗборівськаГромада"
+    post_text = (
+        f"📍 <b>{settlement}</b>\n\n{body}\n\n"
+        "🤖 <b>Зборів | Моя громада</b> — корисна інформація для жителів громади.\n"
+        "Підписуйтеся на сповіщення та користуйтеся ботом.\n\n"
+        "#ЗборівськаГромада"
+    )
+    keyboard = bot_deep_link_menu()
     sent_to = 0
+
     if CHANNEL_ID:
         try:
-            await bot.send_message(CHANNEL_ID, post_text, parse_mode="HTML")
+            if message.photo:
+                await bot.send_photo(
+                    CHANNEL_ID, message.photo[-1].file_id,
+                    caption=post_text, parse_mode="HTML", reply_markup=keyboard
+                )
+            else:
+                await bot.send_message(
+                    CHANNEL_ID, post_text, parse_mode="HTML", reply_markup=keyboard
+                )
         except Exception as e:
             await message.answer(
-                "⚠️ Не вдалося опублікувати в канал. Перевір CHANNEL_ID і права бота.\n\n"
+                "⚠️ Не вдалося опублікувати в канал/групу. Перевір CHANNEL_ID і права бота.\n\n"
                 f"Помилка: {e}"
             )
             return
+
     for user_id in subscribers(settlement):
         try:
-            await bot.send_message(user_id, post_text, parse_mode="HTML")
+            if message.photo:
+                await bot.send_photo(
+                    user_id, message.photo[-1].file_id,
+                    caption=post_text, parse_mode="HTML", reply_markup=keyboard
+                )
+            else:
+                await bot.send_message(
+                    user_id, post_text, parse_mode="HTML", reply_markup=keyboard
+                )
             sent_to += 1
         except Exception:
             pass
+
     await message.answer(
         f"✅ Опубліковано для <b>{settlement}</b>.\n"
-        f"👥 Отримали повідомлення: {sent_to}",
+        f"👥 Отримали повідомлення: {sent_to}\n"
+        "🔘 Додано кнопки: «Світло», «Тривога», «Відкрити бота».",
         parse_mode="HTML",
     )
 
