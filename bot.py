@@ -1561,6 +1561,15 @@ async def stats(message: Message):
     con.close()
     await message.answer(f"👥 Активних підписок: <b>{total}</b>", parse_mode="HTML")
 
+@dp.message(Command("chatid"))
+async def chat_id(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+    await message.answer(
+        f"🆔 ID цього чату:\n<code>{message.chat.id}</code>\n\n"
+        "Скопіюй це число та встав у Railway → Variables → CHANNEL_ID."
+    )
+
 @dp.message(Command("post"))
 async def post(message: Message, bot: Bot):
     if not is_admin(message.from_user.id):
