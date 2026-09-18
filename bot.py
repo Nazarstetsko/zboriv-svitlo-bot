@@ -6,9 +6,7 @@ import json
 import urllib.request
 import urllib.error
 from pathlib import Path
-from urllib.parse import quote, urljoin
-from html.parser import HTMLParser
-from html import escape
+from urllib.parse import quote
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
@@ -72,8 +70,8 @@ CONTACTS = {
         "text": (
             "👮 <b>ВІДДІЛЕННЯ ПОЛІЦІЇ №2 (м. Зборів)</b>\n\n"
             "📍 Адреса: вул. Б. Хмельницького, 44, м. Зборів, 47201\n"
-            "☎️ Телефон: <a href=\"tel:+380354021245\"><b>(03540) 2-12-45</b></a>\n"
-            "🚨 Екстрений номер: <a href=\"tel:102\"><b>102</b></a>\n\n"
+            "☎️ Телефон: <b>(03540) 2-12-45</b>\n"
+            "🚨 Екстрений номер: <b>102</b>\n\n"
             "Дані підрозділу опубліковані на офіційному сайті ГУНП "
             "у Тернопільській області."
         ),
@@ -87,8 +85,8 @@ CONTACTS = {
         "text": (
             "🏥 <b>КНП «ЗБОРІВСЬКА ЛІКАРНЯ»</b>\n\n"
             "📍 47201, м. Зборів, вул. Б. Хмельницького, 17\n"
-            "☎️ Приймальня/загальний: <a href=\"tel:+380354021054\"><b>+380 3540 21054</b></a>\n"
-            "🚑 Швидка допомога: <a href=\"tel:103\"><b>103</b></a>\n\n"
+            "☎️ Приймальня/загальний: <b>+380 3540 21054</b>\n"
+            "🚑 Швидка допомога: <b>103</b>\n\n"
             "Поліклініка: Пн–Пт 09:00–17:00, Сб 09:00–13:00.\n"
             "Лабораторія: Пн–Пт 08:30–15:30.\n"
             "Стоматологія: Пн–Пт 09:00–16:42, Сб 09:00–14:00.\n\n"
@@ -104,7 +102,7 @@ CONTACTS = {
         "text": (
             "🏛️ <b>ЗБОРІВСЬКА МІСЬКА РАДА</b>\n\n"
             "📍 Адреса: вул. Б. Хмельницького, 24, м. Зборів, 47201\n"
-            "☎️ Телефони: <a href=\"tel:+380354021743\"><b>(03540) 2-17-43</b></a>; <a href=\"tel:+380354021186\"><b>2-11-86</b></a>; <a href=\"tel:+380354021050\"><b>2-10-50</b></a>\n"
+            "☎️ Телефони: <b>(03540) 2-17-43; 2-11-86; 2-10-50</b>\n"
             "✉️ rada@zborivska-gromada.gov.ua\n"
             "👤 Голова громади: Максимів Руслан Сергійович\n\n"
             "Графік роботи: Пн–Чт 08:00–17:15, Пт 08:00–16:00."
@@ -119,7 +117,7 @@ CONTACTS = {
         "text": (
             "🛂 <b>Зборівський сектор ДМС</b>\n\n"
             "📍 вул. Б. Хмельницького, 44, м. Зборів\n"
-            "☎️ <a href=\"tel:+380354022420\"><b>+380 3540 22420</b></a>\n\n"
+            "☎️ <b>+380 3540 22420</b>\n\n"
             "Актуальний графік і перелік послуг краще перевіряти на сайті ДМС."
         ),
         "url": OFFICIAL["migration"],
@@ -132,8 +130,8 @@ CONTACTS = {
         "text": (
             "💧 <b>КП «ЗБОРІВСЬКИЙ ВОДОКАНАЛ»</b>\n\n"
             "📍 вул. Козацька, 3, м. Зборів, 47201\n"
-            "☎️ <a href=\"tel:+380672600823\"><b>+380 67 260 08 23</b></a>\n"
-            "☎️ <a href=\"tel:+380354021209\"><b>+380 3540 21209</b></a>\n"
+            "☎️ <b>+380 67 260 08 23</b>\n"
+            "☎️ <b>+380 3540 21209</b>\n"
             "✉️ zborivvodokanal@ukr.net\n\n"
             "Для аварій або відсутності води рекомендується спочатку "
             "уточнити актуальний номер у підприємства."
@@ -405,7 +403,6 @@ TRANSPORT_SETTLEMENTS_2026 = {
 
 def main_menu():
     b = InlineKeyboardBuilder()
-    b.button(text="🔎 Знайти інформацію", callback_data="main:search")
     b.button(text="🏢 Комунальні послуги", callback_data="main:utilities")
     b.button(text="🚌 Автобуси та розклад", callback_data="main:transport")
     b.button(text="📞 Корисні контакти", callback_data="main:contacts")
@@ -415,7 +412,7 @@ def main_menu():
     b.button(text="📰 Новини", callback_data="main:news")
     b.button(text="💬 Спілкування 24/7", callback_data="main:community_chat")
     b.button(text="🚨 Тривога", callback_data="main:alarm")
-    b.adjust(1, 2, 2, 2, 2, 1)
+    b.adjust(2, 2, 2, 2, 1)
     b.row(
         InlineKeyboardButton(text="👍 Корисний", callback_data="feedback:useful"),
         InlineKeyboardButton(text="👎 Не корисний", callback_data="feedback:not_useful"),
@@ -426,6 +423,8 @@ def drivers_menu():
     b = InlineKeyboardBuilder()
     b.button(text="🔧 Контакти СТО", callback_data="driver:sto")
     b.button(text="🛞 Магазини автозапчастин", callback_data="driver:parts")
+    b.button(text="🚨 Штрафи ПДР", callback_data="driver:fines")
+    b.button(text="📷 Карта камер", callback_data="driver:cameras")
     b.button(text="🏠 Головне меню", callback_data="main")
     b.adjust(1, 1, 1)
     return b.as_markup()
@@ -821,7 +820,7 @@ async def main_community(call: CallbackQuery):
         "🏛️ Адміністративний центр: м. Зборів\n\n"
         "👤 Голова громади: Максимів Руслан Сергійович\n"
         "📍 Міська рада: вул. Б. Хмельницького, 24\n"
-        "☎️ <a href=\"tel:+380354021743\">(03540) 2-17-43</a>; <a href=\"tel:+380354021186\">2-11-86</a>; <a href=\"tel:+380354021050\">2-10-50</a>\n"
+        "☎️ (03540) 2-17-43; 2-11-86; 2-10-50\n"
         "✉️ rada@zborivska-gromada.gov.ua",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -988,6 +987,32 @@ async def main_drivers(call: CallbackQuery):
         "🚗 <b>ВОДІЄВІ</b>\n\n"
         "<b>Все для автомобіліста</b> — корисні контакти та сервіси для водіїв у Зборові та громаді.",
         parse_mode="HTML", reply_markup=drivers_menu()
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "driver:fines")
+async def driver_fines(call: CallbackQuery):
+    await call.message.edit_text(
+        "🚨 <b>ШТРАФИ ПДР</b>\n\n"
+        "Перевірити штрафи можна на офіційному сервісі МВС України.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔎 Перевірити штрафи МВС", url="https://bdr.mvs.gov.ua/")],
+            [InlineKeyboardButton(text="⬅️ Водієві", callback_data="main:drivers")],
+        ])
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "driver:cameras")
+async def driver_cameras(call: CallbackQuery):
+    await call.message.edit_text(
+        "📷 <b>КАРТА КАМЕР АВТОФІКСАЦІЇ</b>\n\n"
+        "Актуальну карту камер автоматичної фіксації порушень ПДР можна переглянути на офіційному ресурсі МВС.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📷 Відкрити карту камер", url="https://bdr.mvs.gov.ua/")],
+            [InlineKeyboardButton(text="⬅️ Водієві", callback_data="main:drivers")],
+        ])
     )
     await call.answer()
 
@@ -1325,7 +1350,7 @@ async def elec_contacts(call: CallbackQuery):
     await call.message.edit_text(
         "⚡ <b>АТ «ТЕРНОПІЛЬОБЛЕНЕРГО»</b>\n\n"
         "☎️ Кол-центр: <b>0-800-40-90-40</b> — цілодобово, безкоштовно в Україні\n"
-        "📞 Додатково: <a href=\"tel:+380979934222\">097-993-42-22</a>; <a href=\"tel:+380639934222\">063-993-42-22</a>; <a href=\"tel:+380509934222\">050-993-42-22</a>\n"
+        "📞 Додатково: 097-993-42-22; 063-993-42-22; 050-993-42-22\n"
         "📍 вул. Енергетична, 2, м. Тернопіль\n\n"
         "Офіційний сайт містить графіки погодинних, аварійних "
         "та планових відключень.",
@@ -1413,14 +1438,6 @@ def taxi_menu_markup():
     ])
 
 
-def phone_link(number: str, display: str | None = None) -> str:
-    display = display or number
-    clean = "".join(ch for ch in number if ch.isdigit() or ch == "+")
-    if clean.startswith("0"):
-        clean = "+38" + clean
-    return f'<a href=\"tel:{clean}\"><b>{display}</b></a>'
-
-
 TAXI_DRIVERS = [
     ("Богдан", "068 227 00 89", "+380682270089"),
     ("Богдан", "068 147 19 52", "+380681471952"),
@@ -1433,7 +1450,7 @@ def taxi_driver_text(index: int) -> str:
     name, display_phone, tel_phone = TAXI_DRIVERS[index]
     return (
         f"🚕 <b>{name}</b>\n\n"
-        f'📞 <a href=\"tel:{tel_phone}\"><b>{display_phone}</b></a>\n\n'
+        f'📞 <a href="tel:{tel_phone}"><b>{display_phone}</b></a>\n\n'
         "👆 Натисніть саме на номер — відкриється телефон для дзвінка."
     )
 
@@ -1481,19 +1498,15 @@ async def taxi_driver(call: CallbackQuery):
         await call.answer("Контакт не знайдено", show_alert=True)
         return
 
-    name, display_phone, tel_phone = TAXI_DRIVERS[index]
-    await call.message.delete()
-    await call.bot.send_contact(
-        chat_id=call.message.chat.id,
-        phone_number=tel_phone,
-        first_name=name,
-        vcard=f"BEGIN:VCARD\nVERSION:3.0\nFN:{name}\nTEL;TYPE=CELL:{tel_phone}\nEND:VCARD",
+    await call.message.edit_text(
+        taxi_driver_text(index),
+        parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="⬅️ До таксі", callback_data="main:taxi")],
             [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
         ]),
     )
-    await call.answer("Контакт водія відкрито")
+    await call.answer()
 
 
 @dp.callback_query(F.data.startswith("contact:"))
@@ -1508,9 +1521,9 @@ async def contact(call: CallbackQuery):
     elif key == "dsns":
         await call.message.edit_text(
             "🚒 <b>ДСНС</b>\n\n"
-            "🚨 Пожежа / рятувальна служба: <a href=\"tel:101\"><b>101</b></a>\n"
+            "🚨 Пожежа / рятувальна служба: <b>101</b>\n"
             "📞 Головне управління ДСНС у Тернопільській області:\n"
-            "<a href=\"tel:+380352434330\">+380 352 43-43-30</a>\n\n"
+            "+380 352 43-43-30\n\n"
             "Для негайної небезпеки телефонуйте 101.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -1521,10 +1534,10 @@ async def contact(call: CallbackQuery):
     elif key == "emergency":
         await call.message.edit_text(
             "🚨 <b>ЕКСТРЕНІ НОМЕРИ</b>\n\n"
-            "🚒 Пожежа / рятувальники — <a href=\"tel:101\"><b>101</b></a>\n"
-            "👮 Поліція — <a href=\"tel:102\"><b>102</b></a>\n"
-            "🚑 Швидка допомога — <a href=\"tel:103\"><b>103</b></a>\n"
-            "🔥 Аварійна газова служба — <a href=\"tel:104\"><b>104</b></a>\n\n"
+            "🚒 Пожежа / рятувальники — <b>101</b>\n"
+            "👮 Поліція — <b>102</b>\n"
+            "🚑 Швидка допомога — <b>103</b>\n"
+            "🔥 Аварійна газова служба — <b>104</b>\n\n"
             "У разі безпосередньої загрози життю телефонуйте відповідній службі.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -1534,7 +1547,7 @@ async def contact(call: CallbackQuery):
     elif key == "gas":
         await call.message.edit_text(
             "🔥 <b>ГАЗ</b>\n\n"
-            "🚨 Аварійна газова служба: <a href=\"tel:104\"><b>104</b></a>\n"
+            "🚨 Аварійна газова служба: <b>104</b>\n"
             "📞 Контакти ГК «Нафтогаз України»:\n"
             "066-300-2-888\n098-300-2-888\n093-300-2-888\n\n"
             "Показання лічильника можна передавати онлайн.",
@@ -1549,10 +1562,10 @@ async def contact(call: CallbackQuery):
         await call.message.edit_text(
             "⚡ <b>ЕЛЕКТРОМЕРЕЖІ</b>\n\n"
             "АТ «Тернопільобленерго»\n"
-            "☎️ <a href=\"tel:+380800409040\">0-800-40-90-40</a> — цілодобово\n"
-            "📞 <a href=\"tel:+380979934222\">097-993-42-22</a>\n"
-            "📞 <a href=\"tel:+380639934222\">063-993-42-22</a>\n"
-            "📞 <a href=\"tel:+380509934222\">050-993-42-22</a>",
+            "☎️ 0-800-40-90-40 — цілодобово\n"
+            "📞 097-993-42-22\n"
+            "📞 063-993-42-22\n"
+            "📞 050-993-42-22",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🌐 Офіційний сайт", url=OFFICIAL["electricity"])],
@@ -1570,7 +1583,7 @@ async def important_gas(call: CallbackQuery):
         "2. Відкрийте вікна та двері.\n"
         "3. Не вмикайте і не вимикайте електроприлади.\n"
         "4. Вийдіть із приміщення.\n"
-        "5. Зателефонуйте <a href=\"tel:104\"><b>104</b></a>.",
+        "5. Зателефонуйте <b>104</b>.",
         parse_mode="HTML",
         reply_markup=important_menu()
     )
@@ -1595,8 +1608,8 @@ async def important_water(call: CallbackQuery):
     await call.message.edit_text(
         "💧 <b>АВАРІЯ ВОДОПОСТАЧАННЯ</b>\n\n"
         "КП «Зборівський водоканал»\n"
-        "☎️ <a href=\"tel:+380672600823\">+380 67 260 08 23</a>\n"
-        "☎️ <a href=\"tel:+380354021209\">+380 3540 21209</a>\n"
+        "☎️ +380 67 260 08 23\n"
+        "☎️ +380 3540 21209\n"
         "📍 вул. Козацька, 3, м. Зборів",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -1722,195 +1735,8 @@ async def post(message: Message, bot: Bot):
         parse_mode="HTML",
     )
 
-class _DDGParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.results = []
-        self._in_title = False
-        self._in_snippet = False
-        self._href = ""
-        self._title = ""
-        self._snippet = ""
-
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        cls = attrs.get("class", "")
-        if tag == "a" and "result__a" in cls:
-            self._in_title = True
-            self._href = attrs.get("href", "")
-            self._title = ""
-        if tag in ("a", "div") and "result__snippet" in cls:
-            self._in_snippet = True
-            self._snippet = ""
-
-    def handle_data(self, data):
-        if self._in_title:
-            self._title += data
-        if self._in_snippet:
-            self._snippet += data
-
-    def handle_endtag(self, tag):
-        if tag == "a" and self._in_title:
-            if self._title.strip() and self._href:
-                self.results.append({
-                    "title": " ".join(self._title.split()),
-                    "url": self._href,
-                    "snippet": "",
-                })
-            self._in_title = False
-        if self._in_snippet and tag in ("a", "div"):
-            snippet = " ".join(self._snippet.split())
-            if self.results:
-                self.results[-1]["snippet"] = snippet
-            self._in_snippet = False
-
-
-def _normalize_query(text: str) -> str:
-    return " ".join(text.replace("\n", " ").split()).strip()
-
-
-def _search_web(query: str, limit: int = 4):
-    q = _normalize_query(query)
-    if not q:
-        return []
-    # Спочатку шукаємо інформацію громади та України, але не обмежуємо запит лише ними.
-    url = "https://html.duckduckgo.com/html/?q=" + quote(q)
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; ZborivMoyaGromadaBot/1.0)"
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=8) as response:
-            data = response.read().decode("utf-8", errors="ignore")
-        parser = _DDGParser()
-        parser.feed(data)
-        clean = []
-        seen = set()
-        for item in parser.results:
-            href = item["url"]
-            if href.startswith("//"):
-                href = "https:" + href
-            if not href.startswith("http") or href in seen:
-                continue
-            seen.add(href)
-            clean.append({**item, "url": href})
-            if len(clean) >= limit:
-                break
-        return clean
-    except Exception:
-        return []
-
-
-def _search_local(text: str):
-    q = text.lower()
-    # Контакти
-    contact_words = {
-        "police": ["поліці", "поліція", "102"],
-        "hospital": ["лікар", "лікарн", "медицин", "103", "швидк"],
-        "city": ["міська рада", "мерія", "рада", "мер"],
-        "water": ["водоканал", "вода", "води"],
-        "migration": ["дмс", "міграці", "паспорт"],
-    }
-    for key, words in contact_words.items():
-        if any(w in q for w in words):
-            return CONTACTS.get(key)
-    if any(w in q for w in ["газ", "104"]):
-        return {"title": "🔥 Газова служба", "text": "🔥 <b>Газова служба</b>\n\n🚨 Аварійний номер: <a href=\"tel:104\"><b>104</b></a>", "url": OFFICIAL["gas"], "map": None}
-    if any(w in q for w in ["світл", "електр", "відключ", "обленерго"]):
-        return {"title": "⚡ Електроенергія", "text": "⚡ <b>Електроенергія</b>\n\nПеревірити актуальний графік та стан електропостачання можна на офіційному сервісі Тернопільобленерго.", "url": OFFICIAL["power_check"], "map": None}
-    if any(w in q for w in ["автобус", "розклад", "маршрут", "тернопіл"]):
-        return {"title": "🚌 Автобуси та розклад", "text": "🚌 <b>Автобуси та розклад</b>\n\nЯ можу показати доступні дані про напрямки та населені пункти громади. Відкрийте розділ транспорту для повного переліку.", "url": OFFICIAL["bus_station"], "map": None}
-    if any(w in q for w in ["таксі", "таксист", "богдан", "міша", "василь"]):
-        return {"title": "🚕 Таксі", "text": "🚕 <b>Таксі Зборів</b>\n\nОберіть водія у розділі таксі, щоб отримати його контакт.", "url": None, "map": None}
-    if any(w in q for w in ["громад", "зборів", "населен", "площа", "населення"]):
-        return {"title": "🏛️ Про громаду", "text": "🏛️ <b>Зборівська громада</b>\n\n53 населені пункти, площа 466,9 км², адміністративний центр — м. Зборів. Повна інформація доступна у розділі «Про громаду».", "url": OFFICIAL["community"], "map": None}
-    if any(w in q for w in ["новин", "оголошенн", "поді"]):
-        return {"title": "📰 Новини", "text": "📰 <b>Новини громади</b>\n\nАктуальні новини та оголошення можна переглянути на офіційному сайті громади.", "url": OFFICIAL["community"], "map": None}
-    return None
-
-
-def search_result_keyboard(results):
-    rows = []
-    for i, item in enumerate(results[:4]):
-        rows.append([InlineKeyboardButton(text=f"🔗 {item['title'][:45]}", url=item["url"])])
-    rows.append([InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-@dp.callback_query(F.data == "main:search")
-async def main_search(call: CallbackQuery):
-    await call.message.edit_text(
-        "🔎 <b>ЗНАЙТИ ІНФОРМАЦІЮ</b>\n\n"
-        "Напишіть мені своїми словами, що потрібно знайти.\n\n"
-        "Наприклад:\n"
-        "• «Телефон поліції»\n"
-        "• «Коли автобус Зборів — Тернопіль?»\n"
-        "• «Де перевірити відключення світла?»\n"
-        "• «Телефон водоканалу»\n"
-        "• «Що є у Зборівській громаді?»\n\n"
-        "🤖 Я спочатку перевірю інформацію, яку має бот, а якщо відповіді немає — спробую знайти її онлайн.",
-        parse_mode="HTML",
-        reply_markup=back_main(),
-    )
-    await call.answer()
-
-
 @dp.message()
 async def assistant_chat(message: Message):
-    if message.chat.type != "private":
-        return
-    text = (message.text or "").strip()
-    q = text.lower()
-    if not text:
-        return
-
-    local = _search_local(text)
-    if local and local.get("url"):
-        await message.answer(local["text"], parse_mode="HTML", reply_markup=url_keyboard(local["url"], local.get("map")))
-        return
-    if local and local.get("title") == "🚕 Таксі":
-        await message.answer(local["text"], parse_mode="HTML", reply_markup=taxi_menu_markup())
-        return
-    if local:
-        await message.answer(local["text"], parse_mode="HTML", reply_markup=back_main())
-        return
-
-    # Пошук по локальній базі транспорту за назвою населеного пункту.
-    for place in SETTLEMENTS:
-        if place.lower() in q:
-            if any(w in q for w in ["автобус", "розклад", "рейс", "маршрут"]):
-                await message.answer(transport_place_text(place), parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🚌 Відкрити розклад", callback_data=f"transport:place:{SETTLEMENTS.index(place)}")],
-                    [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
-                ]))
-                return
-
-    results = _search_web(text)
-    if results:
-        lines = ["🔎 <b>ЗНАЙШОВ ОНЛАЙН</b>", "", f"Запит: <i>{escape(text[:180])}</i>", ""]
-        for item in results:
-            lines.append(f"• <b>{escape(item['title'])}</b>")
-            if item.get("snippet"):
-                lines.append(escape(item["snippet"][:220]))
-            lines.append("")
-        lines.append("ℹ️ Перевіряйте інформацію за відкритим джерелом, особливо якщо вона може змінюватися.")
-        await message.answer("\n".join(lines), parse_mode="HTML", reply_markup=search_result_keyboard(results))
-        return
-
-    await message.answer(
-        "🤖 <b>Не знайшов точної відповіді.</b>\n\n"
-        "Спробуйте сформулювати питання трохи інакше. Наприклад:\n"
-        "• «Телефон поліції»\n"
-        "• «Автобус із Зборова до Тернополя»\n"
-        "• «Відключення світла»\n"
-        "• «Телефон водоканалу»\n"
-        "• «Таксі Зборів»",
-        parse_mode="HTML",
-        reply_markup=back_main(),
-    )
-
     text = (message.text or "").lower().strip()
     if not text:
         return
@@ -1930,7 +1756,7 @@ async def assistant_chat(message: Message):
         await message.answer(item["text"], parse_mode="HTML", reply_markup=url_keyboard(item["url"], item["map"]))
     elif any(x in text for x in ["газ", "104"]):
         await message.answer(
-            "🔥 Аварійна газова служба: <a href=\"tel:104\"><b>104</b></a>\n\n"
+            "🔥 Аварійна газова служба: <b>104</b>\n\n"
             "Якщо відчули запах газу — вийдіть із приміщення та телефонуйте 104.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
