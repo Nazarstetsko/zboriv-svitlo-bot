@@ -1053,92 +1053,65 @@ async def main_community_chat(call: CallbackQuery):
     await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
 
-def alarm_places_keyboard(page: int = 0):
-    total_pages = (len(SETTLEMENTS) + PAGE_SIZE - 1) // PAGE_SIZE
-    page = max(0, min(page, total_pages - 1))
-    start = page * PAGE_SIZE
-    items = SETTLEMENTS[start:start + PAGE_SIZE]
-    b = InlineKeyboardBuilder()
-    for i, name in enumerate(items, start=start):
-        b.button(text=f"📍 {name}", callback_data=f"alarmplace:{i}")
-    b.adjust(2)
-    nav = []
-    if page > 0:
-        nav.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"alarmplaces:{page-1}"))
-    nav.append(InlineKeyboardButton(text=f"{page+1}/{total_pages}", callback_data="noop"))
-    if page < total_pages - 1:
-        nav.append(InlineKeyboardButton(text="Далі ➡️", callback_data=f"alarmplaces:{page+1}"))
-    b.row(*nav)
-    b.row(InlineKeyboardButton(text="🏠 Головне меню", callback_data="main"))
-    return b.as_markup()
-
 def alarm_menu(user_id: int):
     current = get_alarm_subscription(user_id)
     rows = [
-        [InlineKeyboardButton(text="🚨 Відкрити карту тривог", url="https://map.ukrainealarm.com/")],
-        [InlineKeyboardButton(text="🔔 Підписатися за моєю локацією", callback_data="alarm:location")],
+        [InlineKeyboardButton(text="🔔 Підписатися на сповіщення", callback_data="alarm:subscribe")],
     ]
     if current:
-        rows.append([InlineKeyboardButton(text=f"📍 Моя локація: {current}", callback_data="alarm:status")])
-        rows.append([InlineKeyboardButton(text="🔕 Відписатися від тривог", callback_data="alarm:unsubscribe")])
+        rows.append([InlineKeyboardButton(text="🟢 Статус підписки", callback_data="alarm:status")])
+        rows.append([InlineKeyboardButton(text="🔕 Відписатися від сповіщень", callback_data="alarm:unsubscribe")])
+    rows.append([InlineKeyboardButton(text="🗺️ Відкрити карту тривог", url="https://map.ukrainealarm.com/")])
     rows.append([InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 @dp.callback_query(F.data == "main:alarm")
 async def main_alarm(call: CallbackQuery):
     current = get_alarm_subscription(call.from_user.id)
-    status = f"\n\n📍 Ваша локація: <b>{current}</b>" if current else "\n\n📍 Локацію для сповіщень ще не обрано."
+    status = (
+        "\n\n🟢 <b>Підписка активна.</b> Сповіщення охоплюють Зборівську міську територіальну громаду та Тернопільську область."
+        if current else
+        "\n\n🟡 <b>Підписка ще не активна.</b>"
+    )
     api_status = (
         "\n\n🟢 Автоматичні сповіщення підключені." if ALERTS_API_TOKEN
         else "\n\n🟡 Для автоматичних сповіщень потрібно додати <code>ALERTS_API_TOKEN</code> у Railway."
     )
     await call.message.edit_text(
         "🚨 <b>ПОВІТРЯНА ТРИВОГА</b>\n\n"
-        "Оберіть населений пункт і бот автоматично надсилатиме повідомлення про початок тривоги та відбій. "
-        "Також можна відкрити офіційну карту." + status + api_status,
+        "Підпишіться на автоматичні сповіщення про <b>початок та відбій повітряної тривоги</b> для "
+        "Зборівської міської територіальної громади та Тернопільської області.\n\n"
+        "📍 <b>Населені пункти обирати не потрібно.</b>" + status + api_status,
         parse_mode="HTML", reply_markup=alarm_menu(call.from_user.id)
     )
     await call.answer()
 
-@dp.callback_query(F.data == "alarm:location")
-async def alarm_location(call: CallbackQuery):
+@dp.callback_query(F.data == "alarm:subscribe")
+async def alarm_subscribe(call: CallbackQuery):
+    set_alarm_subscription(call.from_user.id, "Зборівська громада + Тернопільська область")
     await call.message.edit_text(
-        "📍 <b>ОБЕРІТЬ НАСЕЛЕНИЙ ПУНКТ</b>\n\n"
-        "Саме для нього ви отримуватимете повідомлення про повітряну тривогу та відбій.",
-        parse_mode="HTML", reply_markup=alarm_places_keyboard(0)
-    )
-    await call.answer()
-
-@dp.callback_query(F.data.startswith("alarmplaces:"))
-async def alarm_places_page(call: CallbackQuery):
-    p = int(call.data.split(":")[1])
-    await call.message.edit_reply_markup(reply_markup=alarm_places_keyboard(p))
-    await call.answer()
-
-@dp.callback_query(F.data.startswith("alarmplace:"))
-async def alarm_place(call: CallbackQuery):
-    index = int(call.data.split(":")[1])
-    settlement = SETTLEMENTS[index]
-    set_alarm_subscription(call.from_user.id, settlement)
-    await call.message.edit_text(
-        f"🔔 <b>Сповіщення увімкнено</b>\n\n"
-        f"📍 Локація: <b>{settlement}</b>\n\n"
-        "Тепер бот перевірятиме актуальний статус тривоги та надсилатиме повідомлення про початок і відбій.\n\n"
-        "⚠️ Це інформаційний сервіс. У разі небезпеки орієнтуйтеся на офіційні сповіщення та негайно прямуйте в укриття.",
+        "🔔 <b>СПОВІЩЕННЯ УВІМКНЕНО</b>\n\n"
+        "Ви підписалися на автоматичні сповіщення про <b>початок та відбій повітряної тривоги</b> "
+        "у Зборівській міській територіальній громаді та Тернопільській області.\n\n"
+        "📍 <b>Вибір населеного пункту не потрібен.</b>\n\n"
+        "⚠️ Це інформаційний сервіс. Для власної безпеки також користуйтеся офіційними системами оповіщення "
+        "та негайно прямуйте в укриття під час тривоги.",
         parse_mode="HTML", reply_markup=alarm_menu(call.from_user.id)
     )
     await call.answer("Сповіщення увімкнено ✅")
 
 @dp.callback_query(F.data == "alarm:status")
 async def alarm_status(call: CallbackQuery):
-    place = get_alarm_subscription(call.from_user.id)
-    text = (
-        f"🔔 <bПІДПИСКА НА ТРИВОГУ</b>\n\n📍 Ваша локація: <b>{place}</b>\n\n"
-        "Автоматичні сповіщення активні." if place else
-        "🔔 <b>ПІДПИСКА</b>\n\nЛокацію ще не обрано."
-    )
-    # Correct malformed tag defensively for old clients/code edits.
-    text = text.replace("<bПІДПИСКА", "<b>ПІДПИСКА")
+    current = get_alarm_subscription(call.from_user.id)
+    if current:
+        text = (
+            "🟢 <bСТАН ПІДПИСКИ</b>\n\n"
+            "🔔 Сповіщення активні.\n\n"
+            "📍 Охоплення: <b>Зборівська міська територіальна громада + Тернопільська область</b>.\n\n"
+            "Населений пункт окремо не обирається."
+        ).replace("<bСТАН", "<b>СТАН")
+    else:
+        text = "🟡 <b>ПІДПИСКА НЕ АКТИВНА</b>\n\nНатисніть кнопку нижче, щоб увімкнути сповіщення."
     await call.message.edit_text(text, parse_mode="HTML", reply_markup=alarm_menu(call.from_user.id))
     await call.answer()
 
@@ -1165,24 +1138,26 @@ async def fetch_active_alerts():
         logging.warning("Alerts API error: %s", exc)
         return None
 
-def alert_applies_to_settlement(alert: dict, settlement: str) -> bool:
+def alert_applies_to_subscription(alert: dict) -> bool:
     if alert.get("alert_type") != "air_raid":
         return False
     title = str(alert.get("location_title", "")).lower()
     raion = str(alert.get("location_raion", "")).lower()
     oblast = str(alert.get("location_oblast", "")).lower()
-    settlement_l = settlement.lower()
-    # Exact community-level alert for Zboriv hromada.
-    if "зборів" in title and ("громад" in title or alert.get("location_type") == "hromada"):
+    location_type = alert.get("location_type")
+
+    # Сповіщення на рівні Зборівської громади.
+    if "зборів" in title and ("громад" in title or location_type == "hromada"):
         return True
-    # If API reports a specific settlement, match it.
-    if settlement_l in title:
+
+    # Сповіщення на рівні Тернопільської області.
+    if "тернопільськ" in oblast and location_type == "oblast":
         return True
-    # District/oblast-wide alert covers the user's settlement.
-    if "тернопільськ" in oblast and alert.get("location_type") == "oblast":
+
+    # Додатково враховуємо районне сповіщення, якщо API його повертає.
+    if "тернопільськ" in raion and location_type == "raion":
         return True
-    if "тернопільськ" in raion and alert.get("location_type") == "raion":
-        return True
+
     return False
 
 async def alerts_monitor(bot: Bot):
@@ -1201,8 +1176,8 @@ async def alerts_monitor(bot: Bot):
                     aid = str(alert.get("id", ""))
                     if not aid:
                         continue
-                    for user_id, settlement in subs:
-                        if alert_applies_to_settlement(alert, settlement):
+                    for user_id, scope in subs:
+                        if alert_applies_to_subscription(alert):
                             key = (user_id, aid)
                             current_keys.add(key)
                             if key not in previous_active:
@@ -1210,7 +1185,7 @@ async def alerts_monitor(bot: Bot):
                                 await bot.send_message(
                                     user_id,
                                     "🚨 <b>ПОВІТРЯНА ТРИВОГА!</b>\n\n"
-                                    f"📍 Локація: <b>{settlement}</b>\n"
+                                    f"📍 Локація: <b>Зборівська громада / Тернопільська область</b>\n"
                                     f"📡 Джерело: {title}\n\n"
                                     "⚠️ Негайно прямуйте до укриття!",
                                     parse_mode="HTML",
@@ -1218,8 +1193,8 @@ async def alerts_monitor(bot: Bot):
                 ended = previous_active - current_keys
                 for user_id, aid in ended:
                     # A missing alert means the previously active alert ended.
-                    place = get_alarm_subscription(user_id)
-                    if place:
+                    scope = get_alarm_subscription(user_id)
+                    if scope:
                         await bot.send_message(
                             user_id,
                             "🟢 <b>ВІДБІЙ ПОВІТРЯНОЇ ТРИВОГИ</b>\n\n"
