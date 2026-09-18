@@ -593,6 +593,19 @@ async def start(message: Message, command: CommandObject):
         "contacts": ("📞 <b>КОРИСНІ КОНТАКТИ</b>", contacts_menu),
         "drivers": ("🚗 <b>ВОДІЄВІ</b>", drivers_menu),
     }
+    if payload == "taxi":
+        await message.answer(
+            "🚕 <b>ТАКСІ ЗБОРІВ</b>\n\n"
+            "Оберіть водія для дзвінка.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="🚕 Відкрити таксі", callback_data="main:taxi"),
+                ],
+                [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
+            ]),
+        )
+        return
     if payload in deep_links:
         title, menu_fn = deep_links[payload]
         await message.answer(title + "\n\nОберіть потрібний розділ:", parse_mode="HTML", reply_markup=menu_fn())
@@ -1177,7 +1190,7 @@ async def alerts_monitor(bot: Bot):
                         await bot.send_message(
                             user_id,
                             "🟢 <b>ВІДБІЙ ПОВІТРЯНОЇ ТРИВОГИ</b>\n\n"
-                            f"📍 Локація: <b>{place}</b>",
+                            f"📍 Локація: <b>{scope}</b>",
                             parse_mode="HTML",
                         )
                 previous_active = current_keys
@@ -1393,32 +1406,35 @@ async def contact_sto(call: CallbackQuery):
 
 @dp.callback_query(F.data.in_({"main:taxi", "contact:taxi"}))
 async def contact_taxi(call: CallbackQuery):
-    await call.answer()
     taxi_text = (
         "🚕 <b>ТАКСІ ЗБОРІВ</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
-        "🚕 <b>БОГДАН</b>\n"
-        "📱 068 227 00 89\n\n"
-        "🚕 <b>БОГДАН</b>\n"
-        "📱 068 147 19 52\n\n"
-        "🚕 <b>МІША</b>\n"
-        "📱 096 255 36 44\n\n"
-        "🚕 <b>ВАСИЛЬ</b>\n"
-        "📱 068 999 68 44\n\n"
+        "🚕 <b>Богдан</b>  •  📱 068 227 00 89\n"
+        "🚕 <b>Богдан</b>  •  📱 068 147 19 52\n"
+        "🚕 <b>Міша</b>    •  📱 096 255 36 44\n"
+        "🚕 <b>Василь</b> •  📱 068 999 68 44\n\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "⚡ <i>Оберіть водія та натисніть кнопку дзвінка</i>"
+        "📞 <i>Натисніть на номер, щоб зателефонувати</i>"
     )
     taxi_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="🚕 Богдан", url="tel:+380682270089"),
-            InlineKeyboardButton(text="🚕 Богдан", url="tel:+380681471952"),
+            InlineKeyboardButton(text="🚕 Богдан", callback_data="noop"),
+            InlineKeyboardButton(text="📞 068 227 00 89", url="tel:+380682270089"),
         ],
         [
-            InlineKeyboardButton(text="🚕 Міша", url="tel:+380962553644"),
-            InlineKeyboardButton(text="🚕 Василь", url="tel:+380689996844"),
+            InlineKeyboardButton(text="🚕 Богдан", callback_data="noop"),
+            InlineKeyboardButton(text="📞 068 147 19 52", url="tel:+380681471952"),
         ],
         [
-            InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")
+            InlineKeyboardButton(text="🚕 Міша", callback_data="noop"),
+            InlineKeyboardButton(text="📞 096 255 36 44", url="tel:+380962553644"),
+        ],
+        [
+            InlineKeyboardButton(text="🚕 Василь", callback_data="noop"),
+            InlineKeyboardButton(text="📞 068 999 68 44", url="tel:+380689996844"),
+        ],
+        [
+            InlineKeyboardButton(text="🏠 Головне меню", callback_data="main"),
         ],
     ])
     await call.message.edit_text(
@@ -1426,6 +1442,7 @@ async def contact_taxi(call: CallbackQuery):
         parse_mode="HTML",
         reply_markup=taxi_keyboard,
     )
+    await call.answer()
 
 
 @dp.callback_query(F.data.startswith("contact:"))
