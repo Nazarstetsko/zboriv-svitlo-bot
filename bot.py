@@ -70,8 +70,8 @@ CONTACTS = {
         "text": (
             "👮 <b>ВІДДІЛЕННЯ ПОЛІЦІЇ №2 (м. Зборів)</b>\n\n"
             "📍 Адреса: вул. Б. Хмельницького, 44, м. Зборів, 47201\n"
-            "☎️ Телефон: <b>(03540) 2-12-45</b>\n"
-            "🚨 Екстрений номер: <b>102</b>\n\n"
+            "☎️ Телефон: <a href=\"tel:+380354021245\"><b>(03540) 2-12-45</b></a>\n"
+            "🚨 Екстрений номер: <a href=\"tel:102\"><b>102</b></a>\n\n"
             "Дані підрозділу опубліковані на офіційному сайті ГУНП "
             "у Тернопільській області."
         ),
@@ -85,8 +85,8 @@ CONTACTS = {
         "text": (
             "🏥 <b>КНП «ЗБОРІВСЬКА ЛІКАРНЯ»</b>\n\n"
             "📍 47201, м. Зборів, вул. Б. Хмельницького, 17\n"
-            "☎️ Приймальня/загальний: <b>+380 3540 21054</b>\n"
-            "🚑 Швидка допомога: <b>103</b>\n\n"
+            "☎️ Приймальня/загальний: <a href=\"tel:+380354021054\"><b>+380 3540 21054</b></a>\n"
+            "🚑 Швидка допомога: <a href=\"tel:103\"><b>103</b></a>\n\n"
             "Поліклініка: Пн–Пт 09:00–17:00, Сб 09:00–13:00.\n"
             "Лабораторія: Пн–Пт 08:30–15:30.\n"
             "Стоматологія: Пн–Пт 09:00–16:42, Сб 09:00–14:00.\n\n"
@@ -102,7 +102,7 @@ CONTACTS = {
         "text": (
             "🏛️ <b>ЗБОРІВСЬКА МІСЬКА РАДА</b>\n\n"
             "📍 Адреса: вул. Б. Хмельницького, 24, м. Зборів, 47201\n"
-            "☎️ Телефони: <b>(03540) 2-17-43; 2-11-86; 2-10-50</b>\n"
+            "☎️ Телефони: <a href=\"tel:+380354021743\"><b>(03540) 2-17-43</b></a>; <a href=\"tel:+380354021186\"><b>2-11-86</b></a>; <a href=\"tel:+380354021050\"><b>2-10-50</b></a>\n"
             "✉️ rada@zborivska-gromada.gov.ua\n"
             "👤 Голова громади: Максимів Руслан Сергійович\n\n"
             "Графік роботи: Пн–Чт 08:00–17:15, Пт 08:00–16:00."
@@ -117,7 +117,7 @@ CONTACTS = {
         "text": (
             "🛂 <b>Зборівський сектор ДМС</b>\n\n"
             "📍 вул. Б. Хмельницького, 44, м. Зборів\n"
-            "☎️ <b>+380 3540 22420</b>\n\n"
+            "☎️ <a href=\"tel:+380354022420\"><b>+380 3540 22420</b></a>\n\n"
             "Актуальний графік і перелік послуг краще перевіряти на сайті ДМС."
         ),
         "url": OFFICIAL["migration"],
@@ -130,8 +130,8 @@ CONTACTS = {
         "text": (
             "💧 <b>КП «ЗБОРІВСЬКИЙ ВОДОКАНАЛ»</b>\n\n"
             "📍 вул. Козацька, 3, м. Зборів, 47201\n"
-            "☎️ <b>+380 67 260 08 23</b>\n"
-            "☎️ <b>+380 3540 21209</b>\n"
+            "☎️ <a href=\"tel:+380672600823\"><b>+380 67 260 08 23</b></a>\n"
+            "☎️ <a href=\"tel:+380354021209\"><b>+380 3540 21209</b></a>\n"
             "✉️ zborivvodokanal@ukr.net\n\n"
             "Для аварій або відсутності води рекомендується спочатку "
             "уточнити актуальний номер у підприємства."
@@ -818,7 +818,7 @@ async def main_community(call: CallbackQuery):
         "🏛️ Адміністративний центр: м. Зборів\n\n"
         "👤 Голова громади: Максимів Руслан Сергійович\n"
         "📍 Міська рада: вул. Б. Хмельницького, 24\n"
-        "☎️ (03540) 2-17-43; 2-11-86; 2-10-50\n"
+        "☎️ <a href=\"tel:+380354021743\">(03540) 2-17-43</a>; <a href=\"tel:+380354021186\">2-11-86</a>; <a href=\"tel:+380354021050\">2-10-50</a>\n"
         "✉️ rada@zborivska-gromada.gov.ua",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -1322,7 +1322,7 @@ async def elec_contacts(call: CallbackQuery):
     await call.message.edit_text(
         "⚡ <b>АТ «ТЕРНОПІЛЬОБЛЕНЕРГО»</b>\n\n"
         "☎️ Кол-центр: <b>0-800-40-90-40</b> — цілодобово, безкоштовно в Україні\n"
-        "📞 Додатково: 097-993-42-22; 063-993-42-22; 050-993-42-22\n"
+        "📞 Додатково: <a href=\"tel:+380979934222\">097-993-42-22</a>; <a href=\"tel:+380639934222\">063-993-42-22</a>; <a href=\"tel:+380509934222\">050-993-42-22</a>\n"
         "📍 вул. Енергетична, 2, м. Тернопіль\n\n"
         "Офіційний сайт містить графіки погодинних, аварійних "
         "та планових відключень.",
@@ -1410,6 +1410,14 @@ def taxi_menu_markup():
     ])
 
 
+def phone_link(number: str, display: str | None = None) -> str:
+    display = display or number
+    clean = "".join(ch for ch in number if ch.isdigit() or ch == "+")
+    if clean.startswith("0"):
+        clean = "+38" + clean
+    return f'<a href=\"tel:{clean}\"><b>{display}</b></a>'
+
+
 TAXI_DRIVERS = [
     ("Богдан", "068 227 00 89", "+380682270089"),
     ("Богдан", "068 147 19 52", "+380681471952"),
@@ -1422,7 +1430,7 @@ def taxi_driver_text(index: int) -> str:
     name, display_phone, tel_phone = TAXI_DRIVERS[index]
     return (
         f"🚕 <b>{name}</b>\n\n"
-        f'📞 <a href="tel:{tel_phone}"><b>{display_phone}</b></a>\n\n'
+        f'📞 <a href=\"tel:{tel_phone}\"><b>{display_phone}</b></a>\n\n'
         "👆 Натисніть саме на номер — відкриється телефон для дзвінка."
     )
 
@@ -1470,15 +1478,19 @@ async def taxi_driver(call: CallbackQuery):
         await call.answer("Контакт не знайдено", show_alert=True)
         return
 
-    await call.message.edit_text(
-        taxi_driver_text(index),
-        parse_mode="HTML",
+    name, display_phone, tel_phone = TAXI_DRIVERS[index]
+    await call.message.delete()
+    await call.bot.send_contact(
+        chat_id=call.message.chat.id,
+        phone_number=tel_phone,
+        first_name=name,
+        vcard=f"BEGIN:VCARD\nVERSION:3.0\nFN:{name}\nTEL;TYPE=CELL:{tel_phone}\nEND:VCARD",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="⬅️ До таксі", callback_data="main:taxi")],
             [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
         ]),
     )
-    await call.answer()
+    await call.answer("Контакт водія відкрито")
 
 
 @dp.callback_query(F.data.startswith("contact:"))
@@ -1493,9 +1505,9 @@ async def contact(call: CallbackQuery):
     elif key == "dsns":
         await call.message.edit_text(
             "🚒 <b>ДСНС</b>\n\n"
-            "🚨 Пожежа / рятувальна служба: <b>101</b>\n"
+            "🚨 Пожежа / рятувальна служба: <a href=\"tel:101\"><b>101</b></a>\n"
             "📞 Головне управління ДСНС у Тернопільській області:\n"
-            "+380 352 43-43-30\n\n"
+            "<a href=\"tel:+380352434330\">+380 352 43-43-30</a>\n\n"
             "Для негайної небезпеки телефонуйте 101.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -1506,10 +1518,10 @@ async def contact(call: CallbackQuery):
     elif key == "emergency":
         await call.message.edit_text(
             "🚨 <b>ЕКСТРЕНІ НОМЕРИ</b>\n\n"
-            "🚒 Пожежа / рятувальники — <b>101</b>\n"
-            "👮 Поліція — <b>102</b>\n"
-            "🚑 Швидка допомога — <b>103</b>\n"
-            "🔥 Аварійна газова служба — <b>104</b>\n\n"
+            "🚒 Пожежа / рятувальники — <a href=\"tel:101\"><b>101</b></a>\n"
+            "👮 Поліція — <a href=\"tel:102\"><b>102</b></a>\n"
+            "🚑 Швидка допомога — <a href=\"tel:103\"><b>103</b></a>\n"
+            "🔥 Аварійна газова служба — <a href=\"tel:104\"><b>104</b></a>\n\n"
             "У разі безпосередньої загрози життю телефонуйте відповідній службі.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -1519,7 +1531,7 @@ async def contact(call: CallbackQuery):
     elif key == "gas":
         await call.message.edit_text(
             "🔥 <b>ГАЗ</b>\n\n"
-            "🚨 Аварійна газова служба: <b>104</b>\n"
+            "🚨 Аварійна газова служба: <a href=\"tel:104\"><b>104</b></a>\n"
             "📞 Контакти ГК «Нафтогаз України»:\n"
             "066-300-2-888\n098-300-2-888\n093-300-2-888\n\n"
             "Показання лічильника можна передавати онлайн.",
@@ -1534,10 +1546,10 @@ async def contact(call: CallbackQuery):
         await call.message.edit_text(
             "⚡ <b>ЕЛЕКТРОМЕРЕЖІ</b>\n\n"
             "АТ «Тернопільобленерго»\n"
-            "☎️ 0-800-40-90-40 — цілодобово\n"
-            "📞 097-993-42-22\n"
-            "📞 063-993-42-22\n"
-            "📞 050-993-42-22",
+            "☎️ <a href=\"tel:+380800409040\">0-800-40-90-40</a> — цілодобово\n"
+            "📞 <a href=\"tel:+380979934222\">097-993-42-22</a>\n"
+            "📞 <a href=\"tel:+380639934222\">063-993-42-22</a>\n"
+            "📞 <a href=\"tel:+380509934222\">050-993-42-22</a>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🌐 Офіційний сайт", url=OFFICIAL["electricity"])],
@@ -1555,7 +1567,7 @@ async def important_gas(call: CallbackQuery):
         "2. Відкрийте вікна та двері.\n"
         "3. Не вмикайте і не вимикайте електроприлади.\n"
         "4. Вийдіть із приміщення.\n"
-        "5. Зателефонуйте <b>104</b>.",
+        "5. Зателефонуйте <a href=\"tel:104\"><b>104</b></a>.",
         parse_mode="HTML",
         reply_markup=important_menu()
     )
@@ -1580,8 +1592,8 @@ async def important_water(call: CallbackQuery):
     await call.message.edit_text(
         "💧 <b>АВАРІЯ ВОДОПОСТАЧАННЯ</b>\n\n"
         "КП «Зборівський водоканал»\n"
-        "☎️ +380 67 260 08 23\n"
-        "☎️ +380 3540 21209\n"
+        "☎️ <a href=\"tel:+380672600823\">+380 67 260 08 23</a>\n"
+        "☎️ <a href=\"tel:+380354021209\">+380 3540 21209</a>\n"
         "📍 вул. Козацька, 3, м. Зборів",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -1728,7 +1740,7 @@ async def assistant_chat(message: Message):
         await message.answer(item["text"], parse_mode="HTML", reply_markup=url_keyboard(item["url"], item["map"]))
     elif any(x in text for x in ["газ", "104"]):
         await message.answer(
-            "🔥 Аварійна газова служба: <b>104</b>\n\n"
+            "🔥 Аварійна газова служба: <a href=\"tel:104\"><b>104</b></a>\n\n"
             "Якщо відчули запах газу — вийдіть із приміщення та телефонуйте 104.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
