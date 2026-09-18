@@ -858,27 +858,6 @@ async def main_contacts(call: CallbackQuery):
     )
     await call.answer()
 
-@dp.callback_query(F.data == "main:taxi")
-async def main_taxi(call: CallbackQuery):
-    await call.message.edit_text(
-        "🚕 <b>ТАКСІ ЗБОРІВ</b>\n\n"
-        "📞 Оберіть водія та натисніть кнопку, щоб одразу зателефонувати.\n\n"
-        "👤 <b>Богдан</b>\n"
-        "👤 <b>Богдан</b>\n"
-        "👤 <b>Міша</b>\n"
-        "👤 <b>Василь</b>",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📞 Зателефонувати • 068 227 00 89", url="tel:+380682270089")],
-            [InlineKeyboardButton(text="📞 Зателефонувати • 068 147 19 52", url="tel:+380681471952")],
-            [InlineKeyboardButton(text="📞 Зателефонувати • 096 255 36 44", url="tel:+380962553644")],
-            [InlineKeyboardButton(text="📞 Зателефонувати • 068 999 68 44", url="tel:+380689996844")],
-            [InlineKeyboardButton(text="⬅️ Корисні контакти", callback_data="main:contacts"),
-             InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
-        ])
-    )
-    await call.answer()
-
 @dp.callback_query(F.data == "main:important")
 async def main_important(call: CallbackQuery):
     await call.message.edit_text(
@@ -1414,6 +1393,7 @@ async def contact_sto(call: CallbackQuery):
 
 @dp.callback_query(F.data.in_({"main:taxi", "contact:taxi"}))
 async def contact_taxi(call: CallbackQuery):
+    await call.answer()
     await call.message.edit_text(
         "🚕 <b>ТАКСІ ЗБОРІВ</b>\n"
         "⚡ <b>Швидкий виклик • доступні ціни</b>\n\n"
@@ -1435,7 +1415,7 @@ async def contact_taxi(call: CallbackQuery):
             [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
         ])
     )
-    await call.answer()
+
 
 @dp.callback_query(F.data.startswith("contact:"))
 async def contact(call: CallbackQuery):
