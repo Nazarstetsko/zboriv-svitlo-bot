@@ -6,7 +6,9 @@ import json
 import urllib.request
 import urllib.error
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
+from html.parser import HTMLParser
+from html import escape
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
@@ -403,6 +405,7 @@ TRANSPORT_SETTLEMENTS_2026 = {
 
 def main_menu():
     b = InlineKeyboardBuilder()
+    b.button(text="🔎 Знайти інформацію", callback_data="main:search")
     b.button(text="🏢 Комунальні послуги", callback_data="main:utilities")
     b.button(text="🚌 Автобуси та розклад", callback_data="main:transport")
     b.button(text="📞 Корисні контакти", callback_data="main:contacts")
@@ -412,7 +415,7 @@ def main_menu():
     b.button(text="📰 Новини", callback_data="main:news")
     b.button(text="💬 Спілкування 24/7", callback_data="main:community_chat")
     b.button(text="🚨 Тривога", callback_data="main:alarm")
-    b.adjust(2, 2, 2, 2, 1)
+    b.adjust(1, 2, 2, 2, 2, 1)
     b.row(
         InlineKeyboardButton(text="👍 Корисний", callback_data="feedback:useful"),
         InlineKeyboardButton(text="👎 Не корисний", callback_data="feedback:not_useful"),
@@ -1719,8 +1722,195 @@ async def post(message: Message, bot: Bot):
         parse_mode="HTML",
     )
 
+class _DDGParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.results = []
+        self._in_title = False
+        self._in_snippet = False
+        self._href = ""
+        self._title = ""
+        self._snippet = ""
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        cls = attrs.get("class", "")
+        if tag == "a" and "result__a" in cls:
+            self._in_title = True
+            self._href = attrs.get("href", "")
+            self._title = ""
+        if tag in ("a", "div") and "result__snippet" in cls:
+            self._in_snippet = True
+            self._snippet = ""
+
+    def handle_data(self, data):
+        if self._in_title:
+            self._title += data
+        if self._in_snippet:
+            self._snippet += data
+
+    def handle_endtag(self, tag):
+        if tag == "a" and self._in_title:
+            if self._title.strip() and self._href:
+                self.results.append({
+                    "title": " ".join(self._title.split()),
+                    "url": self._href,
+                    "snippet": "",
+                })
+            self._in_title = False
+        if self._in_snippet and tag in ("a", "div"):
+            snippet = " ".join(self._snippet.split())
+            if self.results:
+                self.results[-1]["snippet"] = snippet
+            self._in_snippet = False
+
+
+def _normalize_query(text: str) -> str:
+    return " ".join(text.replace("\n", " ").split()).strip()
+
+
+def _search_web(query: str, limit: int = 4):
+    q = _normalize_query(query)
+    if not q:
+        return []
+    # Спочатку шукаємо інформацію громади та України, але не обмежуємо запит лише ними.
+    url = "https://html.duckduckgo.com/html/?q=" + quote(q)
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; ZborivMoyaGromadaBot/1.0)"
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as response:
+            data = response.read().decode("utf-8", errors="ignore")
+        parser = _DDGParser()
+        parser.feed(data)
+        clean = []
+        seen = set()
+        for item in parser.results:
+            href = item["url"]
+            if href.startswith("//"):
+                href = "https:" + href
+            if not href.startswith("http") or href in seen:
+                continue
+            seen.add(href)
+            clean.append({**item, "url": href})
+            if len(clean) >= limit:
+                break
+        return clean
+    except Exception:
+        return []
+
+
+def _search_local(text: str):
+    q = text.lower()
+    # Контакти
+    contact_words = {
+        "police": ["поліці", "поліція", "102"],
+        "hospital": ["лікар", "лікарн", "медицин", "103", "швидк"],
+        "city": ["міська рада", "мерія", "рада", "мер"],
+        "water": ["водоканал", "вода", "води"],
+        "migration": ["дмс", "міграці", "паспорт"],
+    }
+    for key, words in contact_words.items():
+        if any(w in q for w in words):
+            return CONTACTS.get(key)
+    if any(w in q for w in ["газ", "104"]):
+        return {"title": "🔥 Газова служба", "text": "🔥 <b>Газова служба</b>\n\n🚨 Аварійний номер: <a href=\"tel:104\"><b>104</b></a>", "url": OFFICIAL["gas"], "map": None}
+    if any(w in q for w in ["світл", "електр", "відключ", "обленерго"]):
+        return {"title": "⚡ Електроенергія", "text": "⚡ <b>Електроенергія</b>\n\nПеревірити актуальний графік та стан електропостачання можна на офіційному сервісі Тернопільобленерго.", "url": OFFICIAL["power_check"], "map": None}
+    if any(w in q for w in ["автобус", "розклад", "маршрут", "тернопіл"]):
+        return {"title": "🚌 Автобуси та розклад", "text": "🚌 <b>Автобуси та розклад</b>\n\nЯ можу показати доступні дані про напрямки та населені пункти громади. Відкрийте розділ транспорту для повного переліку.", "url": OFFICIAL["bus_station"], "map": None}
+    if any(w in q for w in ["таксі", "таксист", "богдан", "міша", "василь"]):
+        return {"title": "🚕 Таксі", "text": "🚕 <b>Таксі Зборів</b>\n\nОберіть водія у розділі таксі, щоб отримати його контакт.", "url": None, "map": None}
+    if any(w in q for w in ["громад", "зборів", "населен", "площа", "населення"]):
+        return {"title": "🏛️ Про громаду", "text": "🏛️ <b>Зборівська громада</b>\n\n53 населені пункти, площа 466,9 км², адміністративний центр — м. Зборів. Повна інформація доступна у розділі «Про громаду».", "url": OFFICIAL["community"], "map": None}
+    if any(w in q for w in ["новин", "оголошенн", "поді"]):
+        return {"title": "📰 Новини", "text": "📰 <b>Новини громади</b>\n\nАктуальні новини та оголошення можна переглянути на офіційному сайті громади.", "url": OFFICIAL["community"], "map": None}
+    return None
+
+
+def search_result_keyboard(results):
+    rows = []
+    for i, item in enumerate(results[:4]):
+        rows.append([InlineKeyboardButton(text=f"🔗 {item['title'][:45]}", url=item["url"])])
+    rows.append([InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+@dp.callback_query(F.data == "main:search")
+async def main_search(call: CallbackQuery):
+    await call.message.edit_text(
+        "🔎 <b>ЗНАЙТИ ІНФОРМАЦІЮ</b>\n\n"
+        "Напишіть мені своїми словами, що потрібно знайти.\n\n"
+        "Наприклад:\n"
+        "• «Телефон поліції»\n"
+        "• «Коли автобус Зборів — Тернопіль?»\n"
+        "• «Де перевірити відключення світла?»\n"
+        "• «Телефон водоканалу»\n"
+        "• «Що є у Зборівській громаді?»\n\n"
+        "🤖 Я спочатку перевірю інформацію, яку має бот, а якщо відповіді немає — спробую знайти її онлайн.",
+        parse_mode="HTML",
+        reply_markup=back_main(),
+    )
+    await call.answer()
+
+
 @dp.message()
 async def assistant_chat(message: Message):
+    if message.chat.type != "private":
+        return
+    text = (message.text or "").strip()
+    q = text.lower()
+    if not text:
+        return
+
+    local = _search_local(text)
+    if local and local.get("url"):
+        await message.answer(local["text"], parse_mode="HTML", reply_markup=url_keyboard(local["url"], local.get("map")))
+        return
+    if local and local.get("title") == "🚕 Таксі":
+        await message.answer(local["text"], parse_mode="HTML", reply_markup=taxi_menu_markup())
+        return
+    if local:
+        await message.answer(local["text"], parse_mode="HTML", reply_markup=back_main())
+        return
+
+    # Пошук по локальній базі транспорту за назвою населеного пункту.
+    for place in SETTLEMENTS:
+        if place.lower() in q:
+            if any(w in q for w in ["автобус", "розклад", "рейс", "маршрут"]):
+                await message.answer(transport_place_text(place), parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="🚌 Відкрити розклад", callback_data=f"transport:place:{SETTLEMENTS.index(place)}")],
+                    [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
+                ]))
+                return
+
+    results = _search_web(text)
+    if results:
+        lines = ["🔎 <b>ЗНАЙШОВ ОНЛАЙН</b>", "", f"Запит: <i>{escape(text[:180])}</i>", ""]
+        for item in results:
+            lines.append(f"• <b>{escape(item['title'])}</b>")
+            if item.get("snippet"):
+                lines.append(escape(item["snippet"][:220]))
+            lines.append("")
+        lines.append("ℹ️ Перевіряйте інформацію за відкритим джерелом, особливо якщо вона може змінюватися.")
+        await message.answer("\n".join(lines), parse_mode="HTML", reply_markup=search_result_keyboard(results))
+        return
+
+    await message.answer(
+        "🤖 <b>Не знайшов точної відповіді.</b>\n\n"
+        "Спробуйте сформулювати питання трохи інакше. Наприклад:\n"
+        "• «Телефон поліції»\n"
+        "• «Автобус із Зборова до Тернополя»\n"
+        "• «Відключення світла»\n"
+        "• «Телефон водоканалу»\n"
+        "• «Таксі Зборів»",
+        parse_mode="HTML",
+        reply_markup=back_main(),
+    )
+
     text = (message.text or "").lower().strip()
     if not text:
         return
