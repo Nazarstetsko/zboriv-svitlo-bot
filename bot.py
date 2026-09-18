@@ -1412,7 +1412,7 @@ async def contact_sto(call: CallbackQuery):
     )
     await call.answer()
 
-@dp.callback_query(F.data == "contact:taxi")
+@dp.callback_query(F.data.in_({"main:taxi", "contact:taxi"}))
 async def contact_taxi(call: CallbackQuery):
     await call.message.edit_text(
         "🚕 <b>ТАКСІ ЗБОРІВ</b>\n"
