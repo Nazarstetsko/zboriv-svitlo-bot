@@ -1,4 +1,4 @@
-import asyncio
+asyncio
 import logging
 import os
 import sqlite3
@@ -406,12 +406,13 @@ def main_menu():
     b.button(text="🏢 Комунальні послуги", callback_data="main:utilities")
     b.button(text="🚌 Автобуси та розклад", callback_data="main:transport")
     b.button(text="📞 Корисні контакти", callback_data="main:contacts")
+    b.button(text="🚕 Таксі", callback_data="main:taxi")
     b.button(text="🚗 Водієві", callback_data="main:drivers")
     b.button(text="🏛️ Про громаду", callback_data="main:community")
     b.button(text="📰 Новини", callback_data="main:news")
     b.button(text="💬 Спілкування 24/7", callback_data="main:community_chat")
     b.button(text="🚨 Тривога", callback_data="main:alarm")
-    b.adjust(2, 2, 2, 2)
+    b.adjust(2, 2, 2, 2, 1)
     b.row(
         InlineKeyboardButton(text="👍 Корисний", callback_data="feedback:useful"),
         InlineKeyboardButton(text="👎 Не корисний", callback_data="feedback:not_useful"),
@@ -454,6 +455,7 @@ def contacts_menu():
     b.button(text="💧 Водоканал", callback_data="contact:water")
     b.button(text="🔥 Газова служба", callback_data="contact:gas")
     b.button(text="⚡ Електромережі", callback_data="contact:power")
+    b.button(text="🚕 Таксі", callback_data="contact:taxi")
     b.button(text="🏠 Головне меню", callback_data="main")
     b.adjust(2, 2, 2, 2, 2, 1)
     return b.as_markup()
@@ -853,6 +855,27 @@ async def main_contacts(call: CallbackQuery):
         "📞 <b>КОРИСНІ КОНТАКТИ</b>\n\n"
         "Виберіть службу:",
         parse_mode="HTML", reply_markup=contacts_menu()
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "main:taxi")
+async def main_taxi(call: CallbackQuery):
+    await call.message.edit_text(
+        "🚕 <b>ТАКСІ ЗБОРІВ</b>\n\n"
+        "📞 Оберіть водія та натисніть кнопку, щоб одразу зателефонувати.\n\n"
+        "👤 <b>Богдан</b>\n"
+        "👤 <b>Богдан</b>\n"
+        "👤 <b>Міша</b>\n"
+        "👤 <b>Василь</b>",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📞 Зателефонувати • 068 227 00 89", url="tel:+380682270089")],
+            [InlineKeyboardButton(text="📞 Зателефонувати • 068 147 19 52", url="tel:+380681471952")],
+            [InlineKeyboardButton(text="📞 Зателефонувати • 096 255 36 44", url="tel:+380962553644")],
+            [InlineKeyboardButton(text="📞 Зателефонувати • 068 999 68 44", url="tel:+380689996844")],
+            [InlineKeyboardButton(text="⬅️ Корисні контакти", callback_data="main:contacts"),
+             InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
+        ])
     )
     await call.answer()
 
@@ -1410,6 +1433,31 @@ async def contact_sto(call: CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🔧 Відкрити СТО на карті", url=url)],
             [InlineKeyboardButton(text="⬅️ Корисні контакти", callback_data="main:contacts")],
+        ])
+    )
+    await call.answer()
+
+@dp.callback_query(F.data == "contact:taxi")
+async def contact_taxi(call: CallbackQuery):
+    await call.message.edit_text(
+        "🚕 <b>ТАКСІ ЗБОРІВ</b>\n"
+        "⚡ <b>Швидкий виклик • доступні ціни</b>\n\n"
+        "📞 Оберіть водія нижче та натисніть номер — дзвінок розпочнеться одразу.\n\n"
+        "🚕 <b>Богдан</b>\n"
+        "📞 068 227 00 89\n\n"
+        "🚕 <b>Богдан</b>\n"
+        "📞 068 147 19 52\n\n"
+        "🚕 <b>Міша</b>\n"
+        "📞 096 255 36 44\n\n"
+        "🚕 <b>Василь</b>\n"
+        "📞 068 999 68 44",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📞 Зателефонувати • 068 227 00 89", url="tel:+380682270089")],
+            [InlineKeyboardButton(text="📞 Зателефонувати • 068 147 19 52", url="tel:+380681471952")],
+            [InlineKeyboardButton(text="📞 Зателефонувати • 096 255 36 44", url="tel:+380962553644")],
+            [InlineKeyboardButton(text="📞 Зателефонувати • 068 999 68 44", url="tel:+380689996844")],
+            [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
         ])
     )
     await call.answer()
