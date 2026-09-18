@@ -589,7 +589,9 @@ async def start(message: Message, command: CommandObject):
         return
     if payload == "taxi":
         await message.answer(
-            "🚕 <b>ТАКСІ ЗБОРІВ</b>\n\nОберіть водія:",
+            "🚕 <b>ТАКСІ ЗБОРІВ</b>\n\n"
+            "⚡ <b>ШВИДКИЙ ВИКЛИК • ЗРУЧНО ТА БЕЗ ЗАЙВИХ ПОШУКІВ</b>\n\n"
+            "Оберіть водія, щоб зв’язатися з ним.",
             parse_mode="HTML",
             reply_markup=taxi_menu_markup(),
         )
@@ -1400,71 +1402,83 @@ async def contact_sto(call: CallbackQuery):
 
 def taxi_menu_markup():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🚕 Богдан • 068 227 00 89", callback_data="taxi:0"),
-        ],
-        [
-            InlineKeyboardButton(text="🚕 Богдан • 068 147 19 52", callback_data="taxi:1"),
-        ],
-        [
-            InlineKeyboardButton(text="🚕 Міша • 096 255 36 44", callback_data="taxi:2"),
-        ],
-        [
-            InlineKeyboardButton(text="🚕 Василь • 068 999 68 44", callback_data="taxi:3"),
-        ],
+        [InlineKeyboardButton(text="🚕 Богдан", callback_data="taxi:0")],
+        [InlineKeyboardButton(text="🚕 Богдан", callback_data="taxi:1")],
+        [InlineKeyboardButton(text="🚕 Міша", callback_data="taxi:2")],
+        [InlineKeyboardButton(text="🚕 Василь", callback_data="taxi:3")],
         [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
     ])
+
+
+TAXI_DRIVERS = [
+    ("Богдан", "068 227 00 89", "+380682270089"),
+    ("Богдан", "068 147 19 52", "+380681471952"),
+    ("Міша", "096 255 36 44", "+380962553644"),
+    ("Василь", "068 999 68 44", "+380689996844"),
+]
+
+
+def taxi_driver_text(index: int) -> str:
+    name, display_phone, tel_phone = TAXI_DRIVERS[index]
+    return (
+        f"🚕 <b>{name}</b>\n\n"
+        f'📞 <a href="tel:{tel_phone}"><b>{display_phone}</b></a>\n\n'
+        "👆 Натисніть саме на номер — відкриється телефон для дзвінка."
+    )
+
 
 async def show_taxi(call: CallbackQuery):
     text = (
         "🚕 <b>ТАКСІ ЗБОРІВ</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
-        "🚕 <b>Богдан</b>\n"
-        "📱 068 227 00 89\n\n"
-        "🚕 <b>Богдан</b>\n"
-        "📱 068 147 19 52\n\n"
-        "🚕 <b>Міша</b>\n"
-        "📱 096 255 36 44\n\n"
-        "🚕 <b>Василь</b>\n"
-        "📱 068 999 68 44\n\n"
+        "⚡ <b>ШВИДКИЙ ВИКЛИК • ЗРУЧНО ТА БЕЗ ЗАЙВИХ ПОШУКІВ</b>\n\n"
+        "Оберіть водія, щоб зв’язатися з ним.\n\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "📞 <i>Оберіть водія — відкриється номер для дзвінка.</i>"
+        "📞 <i>Номер телефону буде доступний після вибору водія.</i>"
     )
-    await call.message.edit_text(text, parse_mode="HTML", reply_markup=taxi_menu_markup())
+    await call.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=taxi_menu_markup(),
+    )
+
 
 @dp.callback_query(F.data == "main:taxi")
 async def main_taxi(call: CallbackQuery):
     await show_taxi(call)
     await call.answer()
 
+
 @dp.callback_query(F.data == "contact:taxi")
 async def contact_taxi(call: CallbackQuery):
     await show_taxi(call)
     await call.answer()
 
+
 @dp.callback_query(F.data.startswith("taxi:"))
 async def taxi_driver(call: CallbackQuery):
-    drivers = [
-        ("Богдан", "068 227 00 89", "+380682270089"),
-        ("Богдан", "068 147 19 52", "+380681471952"),
-        ("Міша", "096 255 36 44", "+380962553644"),
-        ("Василь", "068 999 68 44", "+380689996844"),
-    ]
+    # Обробляємо тільки вибір водія: taxi:0 ... taxi:3.
+    parts = call.data.split(":")
+    if len(parts) != 2:
+        return
+
     try:
-        driver = drivers[int(call.data.split(":")[1])]
-    except (ValueError, IndexError):
+        index = int(parts[1])
+        if index < 0 or index >= len(TAXI_DRIVERS):
+            raise ValueError
+    except ValueError:
         await call.answer("Контакт не знайдено", show_alert=True)
         return
-    name, display_phone, tel_phone = driver
-    await call.answer()
-    await call.message.answer(
-        f"🚕 <b>{name}</b>\n\n📞 <b>{display_phone}</b>\n\nНатисніть кнопку нижче, щоб зателефонувати.",
+
+    await call.message.edit_text(
+        taxi_driver_text(index),
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=f"📞 Зателефонувати {display_phone}", url=f"tel:{tel_phone}")],
             [InlineKeyboardButton(text="⬅️ До таксі", callback_data="main:taxi")],
+            [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
         ]),
     )
+    await call.answer()
 
 
 @dp.callback_query(F.data.startswith("contact:"))
