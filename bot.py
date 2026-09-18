@@ -1394,26 +1394,37 @@ async def contact_sto(call: CallbackQuery):
 @dp.callback_query(F.data.in_({"main:taxi", "contact:taxi"}))
 async def contact_taxi(call: CallbackQuery):
     await call.answer()
-    await call.message.edit_text(
+    taxi_text = (
         "🚕 <b>ТАКСІ ЗБОРІВ</b>\n"
-        "⚡ <b>Швидкий виклик • доступні ціни</b>\n\n"
-        "📞 Оберіть водія нижче та натисніть номер — дзвінок розпочнеться одразу.\n\n"
-        "🚕 <b>Богдан</b>\n"
-        "📞 068 227 00 89\n\n"
-        "🚕 <b>Богдан</b>\n"
-        "📞 068 147 19 52\n\n"
-        "🚕 <b>Міша</b>\n"
-        "📞 096 255 36 44\n\n"
-        "🚕 <b>Василь</b>\n"
-        "📞 068 999 68 44",
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "🚕 <b>БОГДАН</b>\n"
+        "📱 068 227 00 89\n\n"
+        "🚕 <b>БОГДАН</b>\n"
+        "📱 068 147 19 52\n\n"
+        "🚕 <b>МІША</b>\n"
+        "📱 096 255 36 44\n\n"
+        "🚕 <b>ВАСИЛЬ</b>\n"
+        "📱 068 999 68 44\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "⚡ <i>Оберіть водія та натисніть кнопку дзвінка</i>"
+    )
+    taxi_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🚕 Богдан", url="tel:+380682270089"),
+            InlineKeyboardButton(text="🚕 Богдан", url="tel:+380681471952"),
+        ],
+        [
+            InlineKeyboardButton(text="🚕 Міша", url="tel:+380962553644"),
+            InlineKeyboardButton(text="🚕 Василь", url="tel:+380689996844"),
+        ],
+        [
+            InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")
+        ],
+    ])
+    await call.message.edit_text(
+        taxi_text,
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📞 Зателефонувати • 068 227 00 89", url="tel:+380682270089")],
-            [InlineKeyboardButton(text="📞 Зателефонувати • 068 147 19 52", url="tel:+380681471952")],
-            [InlineKeyboardButton(text="📞 Зателефонувати • 096 255 36 44", url="tel:+380962553644")],
-            [InlineKeyboardButton(text="📞 Зателефонувати • 068 999 68 44", url="tel:+380689996844")],
-            [InlineKeyboardButton(text="🏠 Головне меню", callback_data="main")],
-        ])
+        reply_markup=taxi_keyboard,
     )
 
 
